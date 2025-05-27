@@ -368,7 +368,17 @@ If you still encounter this issue, ensure you're using the latest version of the
 2. Verify that the `linux-steamdeck` recipe exists and is compatible with your machine
 3. Check that all required kernel configuration files exist in the recipe's files directory
 
-#### 8. Build Directory Issues
+#### 8. Network Access Issues with Kernel Sources
+
+**Error**: `Network access disabled through BB_NO_NETWORK` or `NetworkAccess: Network access disabled` when trying to fetch kernel sources
+
+**Solution**: This has been fixed in the latest version. The `linux-steamdeck` kernel recipe now uses `linux-yocto` sources instead of direct access to kernel.org, which avoids network access issues while still providing Steam Deck optimizations. If you encounter this issue:
+
+1. Ensure you're using the latest version of the BSP with the updated kernel recipe
+2. The kernel recipe now inherits from `linux-yocto` and uses `git://git.yoctoproject.org/linux-yocto.git`
+3. If you have `BB_NO_NETWORK = "1"` set for Ubuntu 24.04 compatibility, the new recipe will work with this setting
+
+#### 9. Build Directory Issues
 
 If BitBake can't find the build directory or configuration:
 ```bash
