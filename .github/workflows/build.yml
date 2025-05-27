@@ -13,7 +13,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         image: [steamdeck-minimal-image, steamdeck-image, steamdeck-installer-image]
@@ -85,6 +85,10 @@ jobs:
         echo 'BB_GENERATE_MIRROR_TARBALLS = "0"' >> conf/local.conf
         echo 'INHERIT += "rm_work"' >> conf/local.conf
         
+        # Fix Ubuntu 24.04 user namespaces issue
+        echo 'BB_NO_NETWORK = "1"' >> conf/local.conf
+        echo 'CONNECTIVITY_CHECK_URIS = ""' >> conf/local.conf
+        
         # Show configuration
         cat conf/local.conf
         bitbake-layers show-layers
@@ -93,6 +97,10 @@ jobs:
       run: |
         cd poky/build
         source ../oe-init-build-env .
+        
+        # Disable user namespaces for Ubuntu 24.04 compatibility
+        export BB_ENV_PASSTHROUGH_ADDITIONS="$BB_ENV_PASSTHROUGH_ADDITIONS PSEUDO_DISABLED"
+        export PSEUDO_DISABLED=1
         
         # Start build
         echo "Building ${{ matrix.image }}..."

@@ -101,6 +101,20 @@ fi
 echo ""
 echo -e "${GREEN}🎉 Steam Deck BSP dependencies installed successfully!${NC}"
 echo ""
+
+# Check for Ubuntu 24.04 user namespaces issue
+if [[ "$OS" == *"Ubuntu"* ]] && [[ "$VER" == "24.04" || "$VER" == "24.10" ]]; then
+    echo -e "${YELLOW}⚠️  Ubuntu 24.04 Notice:${NC}"
+    echo "Ubuntu 24.04 has restricted user namespaces that may cause BitBake errors."
+    echo "If you encounter 'User namespaces are not usable' errors, run:"
+    echo ""
+    echo -e "${BLUE}  export PSEUDO_DISABLED=1${NC}"
+    echo -e "${BLUE}  echo 'BB_NO_NETWORK = \"1\"' >> conf/local.conf${NC}"
+    echo ""
+    echo "See BUILD.md for more solutions."
+    echo ""
+fi
+
 echo "Next steps:"
 echo "1. Clone Yocto: git clone -b scarthgap git://git.yoctoproject.org/poky"
 echo "2. Clone BSP: git clone https://github.com/iZonex/meta-steamdeck-bsp.git"

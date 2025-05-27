@@ -277,6 +277,36 @@ lsblk /dev/sdX
 
 ## Troubleshooting
 
+### Ubuntu 24.04 User Namespaces Issue
+
+Ubuntu 24.04 has restricted user namespaces which can cause BitBake errors:
+
+```
+ERROR: User namespaces are not usable by BitBake, possibly due to AppArmor.
+```
+
+**Solution 1 - Disable user namespaces in BitBake:**
+```bash
+# Add to conf/local.conf
+echo 'BB_NO_NETWORK = "1"' >> conf/local.conf
+echo 'CONNECTIVITY_CHECK_URIS = ""' >> conf/local.conf
+
+# Export environment variable
+export PSEUDO_DISABLED=1
+```
+
+**Solution 2 - Use Ubuntu 22.04 LTS (Recommended):**
+Ubuntu 22.04 LTS doesn't have this restriction and is the most tested platform.
+
+**Solution 3 - Enable user namespaces (if you have admin rights):**
+```bash
+# Temporarily enable (until reboot)
+sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+
+# Or permanently in /etc/sysctl.conf
+echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee -a /etc/sysctl.conf
+```
+
 ### Package Installation Issues
 
 If you encounter package not found errors during dependency installation:
