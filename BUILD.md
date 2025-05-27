@@ -277,81 +277,83 @@ lsblk /dev/sdX
 
 ## Troubleshooting
 
-### Ubuntu 24.04 User Namespaces Issue
+### Common Build Issues
 
-Ubuntu 24.04 has restricted user namespaces which can cause BitBake errors:
+#### 1. Tune Configuration Errors
 
+**Error**: `PACKAGE_ARCHS variable for DEFAULTTUNE (core2-64) does not contain TUNE_PKGARCH` or `Tuning 'core2-64' has no defined features`
+
+**Solution**: This has been fixed in the latest version. The machine configuration now uses the standard `x86-64` tune instead of `core2-64`. If you still encounter this issue:
+
+1. Check that you're using the latest version of the BSP
+2. Verify that `conf/machine/steamdeck-oled.conf` contains `DEFAULTTUNE = "x86-64"`
+3. Ensure the required tune include files are present: `require conf/machine/include/x86/arch-x86.inc` and `require conf/machine/include/x86/x86-base.inc`
+
+#### 2. Ubuntu 24.04 Package Issues
+
+**Error**: `Unable to locate package libegl1-mesa` or `pylint3`
+
+**Solution**: Use the automated dependency installer or the updated package names:
+```bash
+# Use our automated installer (recommended)
+curl -fsSL https://raw.githubusercontent.com/iZonex/meta-steamdeck-bsp/main/scripts/install-deps.sh | bash
+
+# Or manually install with updated package names
+sudo apt-get install libegl1 pylint  # Instead of libegl1-mesa pylint3
 ```
-ERROR: User namespaces are not usable by BitBake, possibly due to AppArmor.
+
+#### 3. BitBake User Namespaces Issue (Ubuntu 24.04)
+
+**Error**: `User namespaces are not usable by BitBake, possibly due to AppArmor`
+
+**Solutions** (choose one):
+
+**Option A**: Use Ubuntu 22.04 (recommended)
+```bash
+# This BSP is tested primarily on Ubuntu 22.04 LTS
 ```
 
-**Solution 1 - Disable user namespaces in BitBake:**
+**Option B**: Configure sysctl (requires reboot)
+```bash
+echo 'kernel.apparmor_restrict_unprivileged_userns = 0' | sudo tee /etc/sysctl.d/60-bitbake.conf
+sudo sysctl --system
+# Reboot required
+```
+
+**Option C**: Use BitBake workarounds
 ```bash
 # Add to conf/local.conf
-echo 'BB_NO_NETWORK = "1"' >> conf/local.conf
-echo 'CONNECTIVITY_CHECK_URIS = ""' >> conf/local.conf
-
-# Export environment variable
-export PSEUDO_DISABLED=1
+PSEUDO_DISABLED = "1"
+BB_NO_NETWORK = "1"
+CONNECTIVITY_CHECK_URIS = ""
 ```
 
-**Solution 2 - Use Ubuntu 22.04 LTS (Recommended):**
-Ubuntu 22.04 LTS doesn't have this restriction and is the most tested platform.
+#### 4. Layer Dependencies
 
-**Solution 3 - Enable user namespaces (if you have admin rights):**
+**Error**: `Layer 'steamdeck-bsp' depends on layer 'networking-layer', but this layer is not enabled`
+
+**Solution**: Add the missing meta-networking layer:
 ```bash
-# Temporarily enable (until reboot)
-sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
-
-# Or permanently in /etc/sysctl.conf
-echo 'kernel.apparmor_restrict_unprivileged_userns=0' | sudo tee -a /etc/sysctl.conf
+bitbake-layers add-layer ../meta-openembedded/meta-networking
 ```
 
-### Package Installation Issues
+#### 5. Build Directory Issues
 
-If you encounter package not found errors during dependency installation:
-
+If BitBake can't find the build directory or configuration:
 ```bash
-# Ubuntu 24.04 specific fixes
-sudo apt-get install libegl1-mesa-dev || sudo apt-get install libegl1
-sudo apt-get install pylint || sudo apt-get install pylint3
-
-# Use our automatic installer instead
-curl -fsSL https://raw.githubusercontent.com/iZonex/meta-steamdeck-bsp/main/scripts/install-deps.sh | bash
+# Ensure you're in the correct directory and environment is sourced
+cd ~/steamdeck-build/poky
+source oe-init-build-env build-steamdeck
 ```
 
-### Disk Space Issues
+### Getting Help
 
-```bash
-# Clean temporary files
-bitbake -c cleansstate steamdeck-image
-rm -rf tmp/work/*
+If you encounter issues not covered here:
 
-# Partially clean sstate cache
-find sstate-cache/ -atime +30 -delete
-```
-
-### Network Errors
-
-```bash
-# Configure proxy if needed
-export http_proxy=http://proxy:port
-export https_proxy=http://proxy:port
-
-# Resume download after error
-bitbake -c fetchall steamdeck-image
-```
-
-### Compilation Errors
-
-```bash
-# Rebuild problematic package
-bitbake -c cleansstate PACKAGE_NAME
-bitbake PACKAGE_NAME
-
-# Verbose error output
-bitbake -v steamdeck-image
-```
+1. Check the [GitHub Issues](https://github.com/iZonex/meta-steamdeck-bsp/issues)
+2. Review the Yocto Project documentation for your version
+3. Ensure all dependencies are correctly installed
+4. Verify you're using compatible versions of all components
 
 ## Performance Optimization
 
