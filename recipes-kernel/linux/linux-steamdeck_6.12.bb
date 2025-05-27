@@ -3,12 +3,14 @@ DESCRIPTION = "Linux kernel with Steam Deck specific patches and optimizations"
 
 require recipes-kernel/linux/linux-yocto.inc
 
-# Kernel version
-PV = "6.12.0"
-SRCREV = "v6.12"
+# Use linux-yocto sources instead of direct kernel.org access
+inherit kernel-yocto
 
-# Kernel source
-SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;branch=linux-6.12.y;protocol=https \
+# Kernel version - use a version that exists in linux-yocto
+PV = "6.6+git${SRCPV}"
+
+# Use linux-yocto compatible source configuration
+SRC_URI = "git://git.yoctoproject.org/linux-yocto.git;branch=${KBRANCH};name=machine;protocol=https \
            file://steamdeck-oled.scc \
            file://steamdeck-hardware.cfg \
            file://steamdeck-graphics.cfg \
@@ -16,6 +18,10 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;branch
            file://steamdeck-input.cfg \
            file://steamdeck-power.cfg \
            "
+
+# Branch and revision for linux-yocto
+KBRANCH = "v6.6/standard/base"
+SRCREV_machine = "${AUTOREV}"
 
 # Kernel config fragments
 KERNEL_FEATURES:append = " \
