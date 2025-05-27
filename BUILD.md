@@ -1,237 +1,437 @@
-# Build Instructions for meta-steamdeck-bsp
+# Steam Deck OLED BSP - Build Guide
 
-**🔗 GitHub Repository:** [https://github.com/iZonex/meta-steamdeck-bsp](https://github.com/iZonex/meta-steamdeck-bsp)
+Comprehensive guide for building Steam Deck Linux images using the Yocto Project.
 
 ## System Requirements
 
-### Host System
+### Minimum Requirements
 
-- Ubuntu 20.04 LTS or newer / Fedora 35+
-- Minimum 8 GB RAM (16 GB recommended)
-- Minimum 100 GB free disk space
-- Multi-core processor (8+ cores recommended)
+- **OS**: Ubuntu 22.04 LTS / Fedora 38+ / openSUSE 15.5+
+- **CPU**: 4 cores (8+ recommended)
+- **RAM**: 8 GB (16+ GB recommended)
+- **Disk**: 100 GB free space (200+ GB on SSD recommended)
+- **Network**: Stable internet connection for package downloads
 
-### Dependencies
+### Recommended Configuration
+
+- **CPU**: Intel i7/Ryzen 7 or better
+- **RAM**: 32 GB or more
+- **Disk**: NVMe SSD with 500+ GB free space
+- **OS**: Ubuntu 22.04 LTS (most tested)
+
+## Installing Dependencies
+
+### Ubuntu/Debian
 
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential \
-  chrpath socat cpio python3 python3-pip python3-pexpect xz-utils \
-  debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa \
-  libsdl1.2-dev pylint3 xterm python3-subunit mesa-common-dev zstd liblz4-tool
-
-# Fedora
-sudo dnf install gawk make wget tar bzip2 gzip python3 unzip perl patch \
-  diffutils diffstat git cpp gcc gcc-c++ glibc-devel texinfo chrpath \
-  ccache perl-Data-Dumper perl-Text-ParseWords perl-Thread-Queue \
-  perl-bignum socat python3-pexpect findutils which file cpio python3-pip \
-  xz python3-GitPython python3-jinja2 SDL-devel xterm rpcgen \
-  mesa-libGL-devel perl-FindBin perl-File-Compare perl-File-Copy \
-  perl-locale zstd lz4
+sudo apt-get update
+sudo apt-get install -y \
+    gawk wget git diffstat unzip texinfo gcc build-essential \
+    chrpath socat cpio python3 python3-pip python3-pexpect \
+    xz-utils debianutils iputils-ping python3-git python3-jinja2 \
+    libegl1-mesa libsdl1.2-dev python3-subunit mesa-common-dev \
+    zstd liblz4-tool file locales libacl1
 ```
 
-## Step-by-Step Build Instructions
+### Fedora/CentOS/RHEL
 
-### 1. Environment Setup
+```bash
+sudo dnf install -y \
+    gawk make wget tar bzip2 gzip python3 unzip perl patch \
+    diffutils diffstat git cpp gcc gcc-c++ glibc-devel texinfo \
+    chrpath ccache perl-Data-Dumper perl-Text-ParseWords \
+    perl-Thread-Queue perl-bignum xz python3-pexpect \
+    hostname file which socat cpio python3-pip python3-jinja2 \
+    python3-git python3-subunit zstd lz4 rpcgen
+```
+
+### openSUSE
+
+```bash
+sudo zypper install -y \
+    python3 python3-pip python3-pexpect gcc gcc-c++ git chrpath make \
+    wget python3-jinja2 python3-subunit tar gzip gawk which diffstat \
+    makeinfo python3-curses patch socat python3-git python3-distutils \
+    file cpio findutils zstd lz4
+```
+
+## Setting Up Build Environment
+
+### 1. Clone Yocto Project
 
 ```bash
 # Create working directory
-mkdir steamdeck-build
-cd steamdeck-build
+mkdir ~/steamdeck-build && cd ~/steamdeck-build
 
-# Clone Poky (Yocto Project reference distribution)
+# Clone Poky (Yocto base)
 git clone -b scarthgap git://git.yoctoproject.org/poky
 cd poky
 
 # Clone required meta-layers
 git clone -b scarthgap git://git.openembedded.org/meta-openembedded
-git clone -b scarthgap https://github.com/meta-qt5/meta-qt5.git
+```
 
-# Clone our BSP layer
+### 2. Clone Steam Deck BSP
+
+```bash
+# In poky directory
 git clone https://github.com/iZonex/meta-steamdeck-bsp.git
 ```
 
-### 2. Build Environment Setup
+### 3. Initialize Build Environment
 
 ```bash
-# Initialize build environment
+# Initialize Yocto environment
 source oe-init-build-env build-steamdeck
 
-# Edit conf/bblayers.conf
-cat >> conf/bblayers.conf << 'EOF'
-BBLAYERS += " \
-  ${TOPDIR}/../meta-openembedded/meta-oe \
-  ${TOPDIR}/../meta-openembedded/meta-python \
-  ${TOPDIR}/../meta-openembedded/meta-networking \
-  ${TOPDIR}/../meta-openembedded/meta-multimedia \
-  ${TOPDIR}/../meta-steamdeck-bsp \
-"
-EOF
+# Add required layers
+bitbake-layers add-layer ../meta-openembedded/meta-oe
+bitbake-layers add-layer ../meta-openembedded/meta-python
+bitbake-layers add-layer ../meta-openembedded/meta-multimedia
+bitbake-layers add-layer ../meta-steamdeck-bsp
+
+# Verify added layers
+bitbake-layers show-layers
 ```
 
-### 3. Build Configuration
+## Build Configuration
+
+### Basic Configuration
+
+Edit `conf/local.conf`:
 
 ```bash
-# Configure conf/local.conf
-cat >> conf/local.conf << 'EOF'
-# Machine for Steam Deck OLED
+# Set target machine
 MACHINE = "steamdeck-oled"
 
-# Build optimization (adjust for your processor)
-BB_NUMBER_THREADS = "8"
-PARALLEL_MAKE = "-j 8"
+# Set distribution
+DISTRO = "poky"
 
-# Additional disk space for image (in MB)
-IMAGE_ROOTFS_EXTRA_SPACE = "2048"
+# Package format
+PACKAGE_CLASSES = "package_rpm"
 
-# Enable systemd
-INIT_MANAGER = "systemd"
+# Multi-core build optimization
+BB_NUMBER_THREADS = "8"        # Number of CPU cores
+PARALLEL_MAKE = "-j 8"         # Parallel compilation
 
-# Distro features
-DISTRO_FEATURES:append = " systemd vulkan opengl wayland x11"
-DISTRO_FEATURES:remove = "sysvinit"
+# Disk space monitoring
+BB_DISKMON_DIRS = "\
+    STOPTASKS,${TMPDIR},1G,100K \
+    STOPTASKS,${DL_DIR},1G,100K \
+    STOPTASKS,${SSTATE_DIR},1G,100K \
+    STOPTASKS,/tmp,100M,100K \
+    ABORT,${TMPDIR},100M,1K \
+    ABORT,${DL_DIR},100M,1K \
+    ABORT,${SSTATE_DIR},100M,1K \
+    ABORT,/tmp,10M,1K"
 
-# Allow commercial licenses for firmware
-LICENSE_FLAGS_WHITELIST = "commercial"
-
-# Caching for faster subsequent builds
-SSTATE_DIR = "${TOPDIR}/../sstate-cache"
-DL_DIR = "${TOPDIR}/../downloads"
-EOF
+# Configuration version
+CONF_VERSION = "2"
 ```
 
-### 4. Building Images
+### Advanced Configuration
 
-#### Installer Image ⭐ **RECOMMENDED FOR FIRST TIME**
+Additional options for `conf/local.conf`:
 
 ```bash
-# Build installer image (takes 1-2 hours, smallest download)
+# Remove temporary files to save space
+INHERIT += "rm_work"
+
+# Caching for faster rebuilds
+SSTATE_DIR = "${TOPDIR}/../sstate-cache"
+DL_DIR = "${TOPDIR}/../downloads"
+
+# Compiler optimization
+EXTRA_OECONF:append = " --enable-optimizations"
+
+# Additional image features
+EXTRA_IMAGE_FEATURES += "debug-tweaks tools-debug dev-pkgs"
+
+# Localization
+IMAGE_LINGUAS = "en-us"
+
+# Additional drivers
+MACHINE_EXTRA_RRECOMMENDS += "kernel-modules"
+
+# Failsafe system by default
+DISTRO_FEATURES:append = " systemd"
+INIT_MANAGER = "systemd"
+```
+
+## Building Images
+
+### Available Images
+
+1. **steamdeck-minimal-image** - Minimal console system
+2. **steamdeck-image** - Full gaming system with Steam
+3. **steamdeck-installer-image** - Interactive installer
+
+### Build Commands
+
+```bash
+# Prepare environment (run in each new session)
+cd ~/steamdeck-build/poky
+source oe-init-build-env build-steamdeck
+
+# Build minimal image
+bitbake steamdeck-minimal-image
+
+# Build full image (takes 2-6 hours)
+bitbake steamdeck-image
+
+# Build installer
 bitbake steamdeck-installer-image
 ```
 
-#### Minimal Image
+### Parallel Building
+
+To speed up, build multiple images in parallel:
 
 ```bash
-# Build minimal image (takes 2-4 hours on first build)
-bitbake steamdeck-minimal-image
-```
-
-#### Full Gaming Image
-
-```bash
-# Build full image with Desktop and Steam (takes 4-8 hours)
+# In different terminals
+bitbake steamdeck-minimal-image &
+bitbake steamdeck-installer-image &
+wait
 bitbake steamdeck-image
 ```
 
-### 5. Build Results
+## Build Results
 
-Built images will be located in:
+### Image Location
 
-```
-build-steamdeck/tmp/deploy/images/steamdeck-oled/
+```bash
+cd tmp/deploy/images/steamdeck-oled
+ls -la
 ```
 
 Main files:
+- `*.wic.bz2` - Compressed disk images (for direct flashing)
+- `*.wic.bmap` - Block maps for fast flashing
+- `*.ext4` - Root filesystems
+- `*.manifest` - List of installed packages
 
-- **Installer**: `steamdeck-installer-image-steamdeck-oled.wic`
-- **Minimal**: `steamdeck-minimal-image-steamdeck-oled.wic`
-- **Gaming**: `steamdeck-image-steamdeck-oled.wic`
-- **Block maps**: `*.wic.bmap` (for fast flashing with bmaptool)
-
-## Installation Methods
-
-### Method 1: Interactive Installer ⭐ **RECOMMENDED**
-
-The installer provides a user-friendly way to install the system to Steam Deck's internal SSD:
+### Verifying Images
 
 ```bash
-# Flash installer to USB drive
-sudo bmaptool copy steamdeck-installer-image-steamdeck-oled.wic.bmap /dev/sdX
+# Check image sizes
+du -h *.wic.bz2
 
-# Boot Steam Deck from USB:
-# 1. Insert USB drive into Steam Deck
-# 2. Hold Volume Down + Power to enter BIOS
-# 3. Select USB boot option
-# 4. Follow the interactive installer wizard
+# Create checksums
+sha256sum *.wic.bz2 > SHA256SUMS.txt
+
+# Check WIC image structure
+wic ls tmp/deploy/images/steamdeck-oled/steamdeck-image-steamdeck-oled.wic
 ```
 
-**Installer Features:**
+## Flashing Images
 
-- 🖥️ Text-based GUI with dialog interface
-- 🔍 Auto-detects Steam Deck hardware
-- 💾 Automatically finds internal SSD
-- ⚙️ Multiple installation options (minimal/gaming/custom)
-- 🛡️ Safety confirmations before making changes
-- 📊 Progress indication during installation
-- 🔄 Automatic reboot after successful installation
-
-### Method 2: Live USB (No Installation)
-
-Boot directly from USB without installing to internal SSD:
+### Using bmaptool (Recommended)
 
 ```bash
-# Flash any image to USB
-sudo bmaptool copy steamdeck-minimal-image-steamdeck-oled.wic.bmap /dev/sdX
+# Install bmaptool
+sudo apt-get install bmap-tools
 
-# Boot from USB (system runs from USB drive)
+# Flash using bmap (faster)
+sudo bmaptool copy steamdeck-image-steamdeck-oled.wic.bz2 /dev/sdX
 ```
 
-### Method 3: Manual Installation
-
-Advanced users can manually install using dd:
+### Using dd
 
 ```bash
-# Flash to internal SSD (⚠️ DANGER: This erases everything!)
-sudo dd if=steamdeck-minimal-image-steamdeck-oled.wic of=/dev/nvme0n1 bs=4M status=progress
+# Decompress and flash
+bunzip2 -c steamdeck-image-steamdeck-oled.wic.bz2 | sudo dd of=/dev/sdX bs=4M status=progress
 ```
 
-## Development and Debugging
+### Creating Bootable USB
 
-### Adding Packages
+```bash
+# For installer
+sudo bmaptool copy steamdeck-installer-image-steamdeck-oled.wic.bz2 /dev/sdX
 
-Add packages to `recipes-core/images/steamdeck-image.bb`:
+# Verify USB
+lsblk /dev/sdX
+```
+
+## Troubleshooting
+
+### Disk Space Issues
+
+```bash
+# Clean temporary files
+bitbake -c cleansstate steamdeck-image
+rm -rf tmp/work/*
+
+# Partially clean sstate cache
+find sstate-cache/ -atime +30 -delete
+```
+
+### Network Errors
+
+```bash
+# Configure proxy if needed
+export http_proxy=http://proxy:port
+export https_proxy=http://proxy:port
+
+# Resume download after error
+bitbake -c fetchall steamdeck-image
+```
+
+### Compilation Errors
+
+```bash
+# Rebuild problematic package
+bitbake -c cleansstate PACKAGE_NAME
+bitbake PACKAGE_NAME
+
+# Verbose error output
+bitbake -v steamdeck-image
+```
+
+### Dependency Issues
+
+```bash
+# Check layer dependencies
+bitbake-layers show-layers
+bitbake-layers check-layers
+
+# Check recipe syntax
+bitbake -p
+```
+
+## Performance Optimization
+
+### Caching
+
+```bash
+# Shared sstate cache for all projects
+export SSTATE_DIR="/opt/yocto-cache/sstate"
+export DL_DIR="/opt/yocto-cache/downloads"
+```
+
+### Memory and CPU
+
+```bash
+# In local.conf - set to number of cores
+BB_NUMBER_THREADS = "$(nproc)"
+PARALLEL_MAKE = "-j $(nproc)"
+
+# Limit memory usage if needed
+BB_NUMBER_THREADS = "4"
+PARALLEL_MAKE = "-j 4"
+```
+
+### Disk Subsystem
+
+```bash
+# Use tmpfs for tmp directory (requires lots of RAM)
+sudo mount -t tmpfs -o size=8G tmpfs /tmp
+
+# Use fast disk for TMPDIR
+TMPDIR = "/fast/disk/tmp"
+```
+
+## Customization
+
+### Adding Packages to Images
+
+In `conf/local.conf`:
+
+```bash
+# Add packages to all images
+CORE_IMAGE_EXTRA_INSTALL += "htop nano git"
+
+# Or in specific image recipe
+IMAGE_INSTALL:append = " my-custom-package"
+```
+
+### Creating Custom Image
+
+Create `recipes-core/images/my-steamdeck-image.bb`:
 
 ```bitbake
-IMAGE_INSTALL += "new-package"
+require steamdeck-image.bb
+
+SUMMARY = "My Custom Steam Deck Image"
+
+IMAGE_INSTALL += " \
+    my-package1 \
+    my-package2 \
+"
+
+# Additional disk space
+IMAGE_ROOTFS_EXTRA_SPACE = "2097152"
 ```
 
 ### Kernel Modification
 
-Kernel configuration is located in:
-
-- `recipes-kernel/linux/linux-steamdeck/steamdeck-*.cfg`
-
-### Build Debugging
-
 ```bash
-# Detailed recipe information
-bitbake -e steamdeck-image | grep IMAGE_INSTALL
+# Kernel configuration
+bitbake -c menuconfig virtual/kernel
 
-# Force package rebuild
-bitbake -c cleanall steamdeck-tools
-bitbake steamdeck-tools
-
-# Debug shell
-bitbake -c devshell steamdeck-tools
+# Save changes
+bitbake -c savedefconfig virtual/kernel
 ```
 
-## Known Issues
+## Automation
 
-1. **First build is very slow** - this is normal, use sstate and download caches
-2. **Disk space shortage** - ensure you have enough space (100+ GB)
-3. **Download errors** - check internet connection for source downloads
+### Full Build Script
 
-## Support
+```bash
+#!/bin/bash
+set -e
 
-For questions and bug reports, please create issues in the [GitHub repository](https://github.com/iZonex/meta-steamdeck-bsp).
+echo "Starting Steam Deck BSP build..."
 
-## Known Issues
+# Setup environment
+cd ~/steamdeck-build/poky
+source oe-init-build-env build-steamdeck
 
-1. **First build is very slow** - this is normal, use sstate and download caches
-2. **Disk space shortage** - ensure you have enough space (100+ GB)
-3. **Download errors** - check internet connection for source downloads
+# Build all images
+for image in steamdeck-minimal-image steamdeck-installer-image steamdeck-image; do
+    echo "Building $image..."
+    bitbake $image
+done
 
-## Support
+echo "Build completed! Images are in tmp/deploy/images/steamdeck-oled/"
+```
 
-For questions and bug reports, please create issues in the project repository.
+### CI/CD Integration
+
+See `.github/workflows/build.yml` for GitHub Actions configuration example.
+
+## Useful Commands
+
+```bash
+# Show recipe information
+bitbake -s | grep steamdeck
+
+# Show dependencies
+bitbake -g steamdeck-image
+
+# Show variables
+bitbake -e steamdeck-image | grep IMAGE_
+
+# Clean everything
+bitbake -c cleanall steamdeck-image
+
+# Check recipe syntax
+bitbake -p
+
+# Build statistics
+bitbake -D steamdeck-image 2>&1 | tee build.log
+```
+
+## Additional Resources
+
+- [Yocto Project Manual](https://docs.yoctoproject.org/)
+- [BitBake User Manual](https://docs.yoctoproject.org/bitbake/)
+- [Yocto Project Reference Manual](https://docs.yoctoproject.org/ref-manual/)
+- [Steam Deck Hardware Documentation](https://www.steamdeck.com/en/tech)
+
+## Getting Help
+
+When encountering issues:
+
+1. Check [GitHub Issues](https://github.com/iZonex/meta-steamdeck-bsp/issues)
+2. Create new issue with detailed problem description
+3. Include error logs and system configuration

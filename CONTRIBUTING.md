@@ -1,17 +1,21 @@
-# Contributing to meta-steamdeck-bsp
+# Contributing to Steam Deck OLED BSP
 
-Thank you for your interest in contributing to the Steam Deck BSP project! 🎮
+Thank you for your interest in contributing to the Steam Deck OLED BSP project! This document provides guidelines for contributing to the project.
 
-## 🔗 Repository
+## How to Contribute
 
-**GitHub:** [https://github.com/iZonex/meta-steamdeck-bsp](https://github.com/iZonex/meta-steamdeck-bsp)
+### 1. Creating Issues
 
-## 🚀 Quick Start for Contributors
+Before starting work, create an issue for:
+- Bugs and problems
+- New features
+- Code improvements
+- Documentation questions
 
-### 1. Fork and Clone
+### 2. Fork and Clone
 
 ```bash
-# Fork the repository on GitHub, then clone your fork
+# Fork the repository through GitHub UI, then clone
 git clone https://github.com/YOUR_USERNAME/meta-steamdeck-bsp.git
 cd meta-steamdeck-bsp
 
@@ -19,154 +23,194 @@ cd meta-steamdeck-bsp
 git remote add upstream https://github.com/iZonex/meta-steamdeck-bsp.git
 ```
 
-### 2. Development Setup
+### 3. Create Branch
 
 ```bash
+# Update main branch
+git checkout main
+git pull upstream main
+
 # Create feature branch
 git checkout -b feature/your-feature-name
 
-# Set up Yocto build environment (see BUILD.md for details)
-mkdir ../steamdeck-build && cd ../steamdeck-build
-git clone -b scarthgap git://git.yoctoproject.org/poky
-cd poky
-ln -s ../../meta-steamdeck-bsp .
-source oe-init-build-env build-steamdeck
+# Or for bug fixes
+git checkout -b fix/bug-description
 ```
 
-### 3. Making Changes
+### 4. Code Standards
+
+#### BitBake Recipes
+
+- Use proper header format:
+  ```bitbake
+  SUMMARY = "Brief package description"
+  DESCRIPTION = "Detailed functionality description"
+  HOMEPAGE = "https://github.com/iZonex/meta-steamdeck-bsp"
+  BUGTRACKER = "https://github.com/iZonex/meta-steamdeck-bsp/issues"
+  LICENSE = "MIT"
+  LIC_FILES_CHKSUM = "file://LICENSE;md5=..."
+  ```
+
+- Use proper dependencies:
+  ```bitbake
+  RDEPENDS:${PN} = "dependency1 dependency2"
+  DEPENDS = "build-dependency1 build-dependency2"
+  ```
+
+#### Shell Scripts
+
+- Use `#!/bin/bash` as shebang
+- Add `set -e` for error handling
+- Quote variables: `"$variable"`
+- Add comments for complex logic
+
+#### Python Scripts
+
+- Follow PEP 8 style
+- Use type hints where possible
+- Add docstrings to functions
+
+### 5. Testing
+
+#### Local Testing
 
 ```bash
-# Make your changes in meta-steamdeck-bsp/
-# Test your changes by building
-bitbake steamdeck-minimal-image
+# Test shell script syntax
+find . -name "*.sh" -type f | xargs shellcheck
 
-# Commit with descriptive messages
-git add .
-git commit -m "Add: New feature for Steam Deck OLED display optimization"
-git push origin feature/your-feature-name
+# Test recipe parsing
+bitbake -p  # Parse recipes
+bitbake steamdeck-minimal-image  # Test build
 ```
 
-### 4. Submit Pull Request
+#### CI/CD Testing
 
-1. Go to GitHub and create a Pull Request
-2. Describe your changes thoroughly
-3. Reference any related issues
+All pull requests are automatically tested through GitHub Actions:
+- Shell script syntax checking
+- BitBake recipe validation
+- Documentation structure verification
+- Test image builds
 
-## 📝 Contribution Guidelines
+### 6. Commit Messages
 
-### What We Accept
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-- **Bug fixes** - Hardware support improvements
-- **New hardware support** - Additional Steam Deck variants
-- **Performance optimizations** - Gaming/power management improvements  
-- **Documentation** - Improvements to guides and README
-- **Testing** - Hardware validation on different Steam Deck models
-- **Installer improvements** - Better user experience
+```
+type(scope): description
 
-### Coding Standards
+[optional body]
 
-- **BitBake recipes** - Follow Yocto Project conventions
-- **Shell scripts** - Use bash with proper error handling
-- **Configuration files** - Clear comments explaining purpose
-- **Documentation** - Update relevant .md files with changes
-
-### Testing Requirements
-
-- Test on actual Steam Deck hardware when possible
-- Verify installer functionality
-- Ensure all images build successfully
-- Document tested configurations
-
-## 🐛 Reporting Issues
-
-### Before Reporting
-
-1. Check existing issues on GitHub
-2. Test with latest main branch
-3. Try with clean build environment
-
-### Issue Template
-
-```markdown
-**Hardware:** Steam Deck OLED/LCD
-**Image:** steamdeck-minimal-image / steamdeck-image / steamdeck-installer-image
-**Host OS:** Ubuntu 22.04 / Fedora 38 / etc.
-**Yocto Version:** Scarthgap (5.0)
-
-**Description:**
-[Clear description of the issue]
-
-**Steps to Reproduce:**
-1. Step one
-2. Step two
-3. Step three
-
-**Expected Behavior:**
-[What should happen]
-
-**Actual Behavior:**
-[What actually happens]
-
-**Build Logs:**
-[Relevant error messages or logs]
+[optional footer]
 ```
 
-## 🔧 Development Areas
+Types:
+- `feat`: new feature
+- `fix`: bug fix
+- `docs`: documentation changes
+- `style`: code formatting (no logic changes)
+- `refactor`: code refactoring
+- `test`: adding tests
+- `chore`: build process changes
 
-### Priority Areas
+Examples:
+```
+feat(failsafe): add automatic rollback on boot failure
 
-- **Hardware support** - WiFi, Bluetooth, sensors
-- **Performance tuning** - Gaming optimizations
-- **Power management** - Battery life improvements
-- **Display optimization** - OLED-specific features
-- **Audio enhancements** - Spatial audio, EQ presets
+fix(installer): resolve partition detection issue on some devices
 
-### Architecture
+docs(readme): update installation instructions
+
+chore(ci): update GitHub Actions to use Node 18
+```
+
+### 7. Pull Request Process
+
+1. Ensure your branch is up to date:
+   ```bash
+   git fetch upstream
+   git rebase upstream/main
+   ```
+
+2. Push your changes:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+3. Create Pull Request through GitHub UI
+
+4. Fill out PR template with:
+   - Description of changes
+   - Related issues
+   - Testing results
+   - Screenshots (if applicable)
+
+### 8. Code Review
+
+- Respond to comments in a timely manner
+- Make requested changes
+- Update PR after rebase if needed
+
+### 9. Specific Areas
+
+#### Failsafe System
+
+When working with A/B system:
+- Test rollback functionality
+- Verify both slot operations
+- Ensure user data preservation
+
+#### Installer
+
+When modifying installer:
+- Test all installation modes
+- Verify hardware detection
+- Validate partition creation
+
+#### Kernel/Hardware
+
+When changing kernel configuration:
+- Test on real hardware if possible
+- Document device tree changes
+- Check driver compatibility
+
+### 10. Documentation
+
+When adding new features:
+- Update README.md
+- Add usage examples
+- Update CHANGELOG.md
+- Document new commands
+
+### 11. Release Process
+
+Maintainers follow this process for releases:
+
+1. Update CHANGELOG.md
+2. Create version tag
+3. Automatic build through GitHub Actions
+4. Create GitHub Release with artifacts
+
+## Project Structure
 
 ```
 meta-steamdeck-bsp/
-├── conf/                    # Layer and machine configuration
-├── recipes-kernel/          # Custom kernel with Steam Deck patches
-├── recipes-steamdeck/       # Steam Deck specific packages
-├── recipes-core/           # System images
-└── wic/                    # Disk layout configuration
+├── conf/                          # Layer configuration
+├── recipes-bsp/                   # BSP-specific packages
+├── recipes-core/                  # System images
+├── recipes-kernel/                # Kernel and modules
+├── recipes-steamdeck/             # Steam Deck utilities
+│   ├── steamdeck-failsafe/       # A/B system
+│   ├── steamdeck-installer/      # Installer
+│   └── steamdeck-tools/          # Hardware utilities
+├── wic/                          # WIC configurations
+├── .github/workflows/            # CI/CD
+└── docs/                         # Documentation
 ```
 
-## 📚 Resources
+## Getting Help
 
-### Documentation
+- Create an issue for questions
+- Refer to existing code as examples
+- Study [Yocto Project documentation](https://docs.yoctoproject.org/)
 
-- [Yocto Project Manual](https://docs.yoctoproject.org/)
-- [BitBake User Manual](https://docs.yoctoproject.org/bitbake/)
-- [Steam Deck Developer Documentation](https://partner.steamgames.com/doc/steamdeck)
-
-### Steam Deck Hardware
-
-- **CPU:** AMD Zen 2 4-core/8-thread (Van Gogh APU)
-- **GPU:** AMD RDNA 2 (8 CUs, 1.0-1.6 GHz)
-- **RAM:** 16 GB LPDDR5
-- **Storage:** NVMe SSD (64/256/512 GB models)
-- **Display:** 7" OLED (1280x800, 90Hz for OLED model)
-
-## 🤝 Community
-
-### Communication
-
-- **Issues:** GitHub Issues for bug reports and feature requests
-- **Discussions:** GitHub Discussions for general questions
-- **Pull Requests:** For code contributions
-
-### Code of Conduct
-
-- Be respectful and inclusive
-- Focus on constructive feedback
-- Help newcomers to the project
-- Keep discussions on-topic
-
-## 📄 License
-
-By contributing to this project, you agree that your contributions will be licensed under the MIT License.
-
----
-
-**Happy hacking!** 🚀
+Thank you for contributing to the Steam Deck Linux ecosystem!

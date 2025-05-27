@@ -1,0 +1,200 @@
+name: Build Steam Deck BSP Images
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  YOCTO_VERSION: scarthgap
+  MACHINE: steamdeck-oled
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [steamdeck-minimal-image, steamdeck-image, steamdeck-installer-image]
+    
+    steps:
+    - name: Checkout BSP
+      uses: actions/checkout@v4
+      with:
+        path: meta-steamdeck-bsp
+
+    - name: Free disk space
+      run: |
+        # Free up disk space for Yocto build
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        df -h
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gawk wget git diffstat unzip texinfo gcc build-essential \
+          chrpath socat cpio python3 python3-pip python3-pexpect \
+          xz-utils debianutils iputils-ping python3-git python3-jinja2 \
+          libegl1-mesa libsdl1.2-dev pylint3 xterm python3-subunit \
+          mesa-common-dev zstd liblz4-tool file locales
+
+    - name: Setup locale
+      run: |
+        sudo locale-gen en_US.UTF-8
+        echo 'export LANG=en_US.UTF-8' >> ~/.bashrc
+
+    - name: Clone Poky
+      run: |
+        git clone -b ${{ env.YOCTO_VERSION }} git://git.yoctoproject.org/poky
+        cd poky
+        git log --oneline -n 5
+
+    - name: Clone meta-openembedded
+      run: |
+        cd poky
+        git clone -b ${{ env.YOCTO_VERSION }} git://git.openembedded.org/meta-openembedded
+
+    - name: Setup build environment
+      run: |
+        cd poky
+        source oe-init-build-env build
+        
+        # Add layers
+        bitbake-layers add-layer ../meta-openembedded/meta-oe
+        bitbake-layers add-layer ../meta-openembedded/meta-python
+        bitbake-layers add-layer ../meta-openembedded/meta-multimedia
+        bitbake-layers add-layer ../../meta-steamdeck-bsp
+        
+        # Configure build
+        echo 'MACHINE = "${{ env.MACHINE }}"' >> conf/local.conf
+        echo 'DISTRO = "poky"' >> conf/local.conf
+        echo 'PACKAGE_CLASSES = "package_rpm"' >> conf/local.conf
+        echo 'BB_DISKMON_DIRS = "STOPTASKS,${TMPDIR},1G,100K STOPTASKS,${DL_DIR},1G,100K STOPTASKS,${SSTATE_DIR},1G,100K STOPTASKS,/tmp,100M,100K ABORT,${TMPDIR},100M,1K ABORT,${DL_DIR},100M,1K ABORT,${SSTATE_DIR},100M,1K ABORT,/tmp,10M,1K"' >> conf/local.conf
+        echo 'CONF_VERSION = "2"' >> conf/local.conf
+        
+        # Optimize for CI
+        echo 'BB_NUMBER_THREADS = "4"' >> conf/local.conf
+        echo 'PARALLEL_MAKE = "-j 4"' >> conf/local.conf
+        echo 'BB_GENERATE_MIRROR_TARBALLS = "0"' >> conf/local.conf
+        echo 'INHERIT += "rm_work"' >> conf/local.conf
+        
+        # Show configuration
+        cat conf/local.conf
+        bitbake-layers show-layers
+
+    - name: Build ${{ matrix.image }}
+      run: |
+        cd poky/build
+        source ../oe-init-build-env .
+        
+        # Start build
+        echo "Building ${{ matrix.image }}..."
+        bitbake ${{ matrix.image }}
+        
+        # Show build results
+        ls -la tmp/deploy/images/${{ env.MACHINE }}/
+
+    - name: Prepare artifacts
+      run: |
+        cd poky/build
+        mkdir -p ../../artifacts
+        
+        # Copy built images
+        cp tmp/deploy/images/${{ env.MACHINE }}/${{ matrix.image }}-${{ env.MACHINE }}.wic* ../../artifacts/ || true
+        cp tmp/deploy/images/${{ env.MACHINE }}/${{ matrix.image }}-${{ env.MACHINE }}.ext4 ../../artifacts/ || true
+        cp tmp/deploy/images/${{ env.MACHINE }}/${{ matrix.image }}-${{ env.MACHINE }}.manifest ../../artifacts/ || true
+        
+        # Create checksums
+        cd ../../artifacts
+        sha256sum * > SHA256SUMS.txt || true
+        ls -la
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.image }}-${{ env.MACHINE }}
+        path: artifacts/
+        retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-artifacts
+
+    - name: Prepare release
+      run: |
+        mkdir -p release
+        find release-artifacts -name "*.wic*" -exec cp {} release/ \;
+        find release-artifacts -name "*.ext4" -exec cp {} release/ \;
+        find release-artifacts -name "SHA256SUMS.txt" -exec cp {} release/SHA256SUMS-{}.txt \;
+        
+        # Create unified checksum
+        cd release
+        sha256sum *.wic* *.ext4 > SHA256SUMS.txt
+        ls -la
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+        body: |
+          # Steam Deck OLED BSP Release ${{ github.ref_name }}
+          
+          ## Images Included
+          
+          - **steamdeck-minimal-image** - Minimal console system (~2-4 GB)
+          - **steamdeck-image** - Full gaming system with Steam (~8-12 GB)  
+          - **steamdeck-installer-image** - Interactive installer (~1-2 GB)
+          
+          ## Installation Methods
+          
+          ### Interactive Installer (Recommended)
+          1. Download `steamdeck-installer-image-steamdeck-oled.wic.bz2`
+          2. Flash to USB: `bmaptool copy steamdeck-installer-image-steamdeck-oled.wic.bz2 /dev/sdX`
+          3. Boot Steam Deck from USB
+          4. Follow installer prompts
+          
+          ### Direct Flash
+          ```bash
+          # Full system
+          bmaptool copy steamdeck-image-steamdeck-oled.wic.bz2 /dev/sdX
+          
+          # Minimal system  
+          bmaptool copy steamdeck-minimal-image-steamdeck-oled.wic.bz2 /dev/sdX
+          ```
+          
+          ## Features
+          
+          - ✅ A/B Failsafe System with automatic rollback
+          - ✅ Dual Boot support with SteamOS preservation
+          - ✅ OTA Updates with verification
+          - ✅ Recovery partition with backup/restore
+          - ✅ Interactive installer with multiple modes
+          
+          ## Verification
+          
+          Verify downloads with SHA256:
+          ```bash
+          sha256sum -c SHA256SUMS.txt
+          ```
+          
+          See [README.md](https://github.com/iZonex/meta-steamdeck-bsp) for detailed documentation.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

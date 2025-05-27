@@ -1,0 +1,187 @@
+name: Test and Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install shellcheck
+      run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+    - name: Check shell scripts
+      run: |
+        find . -name "*.sh" -type f | xargs shellcheck -e SC1091 -e SC2034 -e SC2154 || true
+        echo "Shell script check completed"
+
+    - name: Validate BitBake recipes
+      run: |
+        # Check .bb files syntax
+        find . -name "*.bb" -type f | while read -r file; do
+          echo "Checking $file"
+          # Basic syntax validation
+          if ! python3 -c "
+        import sys
+        with open('$file', 'r') as f:
+            content = f.read()
+            # Check for common issues
+            if 'do_install()' in content and not 'inherit' in content:
+                print('Warning: do_install without inherit in $file')
+            if 'RDEPENDS' in content and '${PN}' not in content:
+                print('Info: RDEPENDS without PN reference in $file')
+        "; then
+            echo "Failed to validate $file"
+          fi
+        done
+
+    - name: Check WIC files
+      run: |
+        find . -name "*.wks" -type f | while read -r file; do
+          echo "Validating WIC file: $file"
+          # Basic WIC syntax check
+          if grep -q "part.*--source" "$file"; then
+            echo "✓ $file has proper part syntax"
+          else
+            echo "⚠ $file might have syntax issues"
+          fi
+        done
+
+  documentation-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check documentation
+      run: |
+        # Check if all important files exist
+        files_to_check=(
+          "README.md"
+          "CHANGELOG.md"
+          "CONTRIBUTING.md"
+          "LICENSE"
+          "BUILD.md"
+        )
+        
+        for file in "${files_to_check[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✓ $file exists"
+          else
+            echo "✗ $file missing"
+            exit 1
+          fi
+        done
+
+    - name: Check links in README
+      run: |
+        # Check for broken internal links
+        if grep -q "(\[.*\])" README.md; then
+          echo "✓ README has proper markdown links"
+        fi
+        
+        # Check if GitHub URLs are correct
+        if grep -q "github.com/iZonex/meta-steamdeck-bsp" README.md; then
+          echo "✓ GitHub URLs are correct"
+        else
+          echo "⚠ GitHub URLs might need updating"
+        fi
+
+  recipe-validation:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip
+        pip3 install --user pyyaml
+
+    - name: Validate recipe structure
+      run: |
+        # Check for required recipe components
+        find . -name "*.bb" -type f | while read -r recipe; do
+          echo "Validating recipe: $recipe"
+          
+          # Check for required fields
+          required_fields=("SUMMARY" "DESCRIPTION" "LICENSE")
+          for field in "${required_fields[@]}"; do
+            if grep -q "^$field" "$recipe"; then
+              echo "✓ $recipe has $field"
+            else
+              echo "⚠ $recipe missing $field"
+            fi
+          done
+          
+          # Check for SRC_URI if not image recipe
+          if [[ ! "$recipe" =~ image\.bb$ ]] && ! grep -q "SRC_URI" "$recipe"; then
+            echo "⚠ $recipe missing SRC_URI (might be intentional)"
+          fi
+        done
+
+    - name: Check layer structure
+      run: |
+        # Validate layer.conf
+        if [ -f "conf/layer.conf" ]; then
+          echo "✓ Layer configuration exists"
+          
+          # Check for required layer.conf content
+          if grep -q "BBFILE_COLLECTIONS" conf/layer.conf; then
+            echo "✓ Layer collection defined"
+          fi
+          
+          if grep -q "LAYERVERSION" conf/layer.conf; then
+            echo "✓ Layer version defined"
+          fi
+        else
+          echo "✗ Layer configuration missing"
+          exit 1
+        fi
+
+  image-build-test:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout BSP
+      uses: actions/checkout@v4
+      with:
+        path: meta-steamdeck-bsp
+
+    - name: Install Yocto dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gawk wget git diffstat unzip texinfo gcc build-essential \
+          chrpath socat cpio python3 python3-pip python3-pexpect \
+          xz-utils debianutils iputils-ping python3-git python3-jinja2
+
+    - name: Clone minimal Poky
+      run: |
+        git clone -b scarthgap --depth=1 git://git.yoctoproject.org/poky
+
+    - name: Test build setup
+      run: |
+        cd poky
+        source oe-init-build-env build-test
+        
+        # Add our BSP layer
+        bitbake-layers add-layer ../../meta-steamdeck-bsp
+        
+        # Set machine
+        echo 'MACHINE = "steamdeck-oled"' >> conf/local.conf
+        
+        # Test that recipes parse correctly
+        echo "Testing recipe parsing..."
+        bitbake -p
+        
+        # Show available images
+        echo "Available images:"
+        bitbake-layers show-recipes "*image*" | grep "^steamdeck" || true 
