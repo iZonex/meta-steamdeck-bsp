@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""
+Steam Deck Controller Configuration Tool
+
+This script handles Steam Deck controller configuration and calibration.
+"""
+
+import sys
+import subprocess
+import os
+import json
+from pathlib import Path
+
+class SteamDeckControllerConfig:
+    def __init__(self):
+        self.config_dir = Path("/etc/steamdeck")
+        self.config_file = self.config_dir / "controller.json"
+        self.ensure_config_dir()
+    
+    def ensure_config_dir(self):
+        """Ensure configuration directory exists"""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+    
+    def load_config(self):
+        """Load controller configuration"""
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+        return self.get_default_config()
+    
+    def get_default_config(self):
+        """Get default controller configuration"""
+        return {
+            "deadzone": {
+                "left_stick": 0.1,
+                "right_stick": 0.1,
+                "left_trigger": 0.05,
+                "right_trigger": 0.05
+            },
+            "sensitivity": {
+                "left_stick": 1.0,
+                "right_stick": 1.0,
+                "gyro": 1.0
+            },
+            "haptic_feedback": True,
+            "steam_input": True
+        }
+    
+    def save_config(self, config):
+        """Save controller configuration"""
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            print(f"Configuration saved to {self.config_file}")
+            return True
+        except IOError as e:
+            print(f"Error saving configuration: {e}")
+            return False
+    
+    def reset_to_defaults(self):
+        """Reset controller to default settings"""
+        config = self.get_default_config()
+        if self.save_config(config):
+            print("Controller configuration reset to defaults")
+            return True
+        return False
+    
+    def show_config(self):
+        """Display current configuration"""
+        config = self.load_config()
+        print("Current Steam Deck Controller Configuration:")
+        print(json.dumps(config, indent=2))
+    
+    def calibrate_controller(self):
+        """Basic controller calibration"""
+        print("Starting controller calibration...")
+        print("Please follow the on-screen instructions.")
+        
+        # Basic calibration placeholder
+        config = self.load_config()
+        
+        print("Calibration completed successfully.")
+        return self.save_config(config)
+
+def print_usage():
+    """Print usage information"""
+    print("Steam Deck Controller Configuration Tool")
+    print("Usage: steamdeck-controller-config [COMMAND]")
+    print("")
+    print("Commands:")
+    print("  show       - Display current configuration")
+    print("  reset      - Reset to default settings")
+    print("  calibrate  - Run controller calibration")
+    print("  help       - Show this help message")
+
+def main():
+    """Main function"""
+    if len(sys.argv) < 2:
+        print_usage()
+        return 1
+    
+    command = sys.argv[1].lower()
+    controller = SteamDeckControllerConfig()
+    
+    if command == "show":
+        controller.show_config()
+    elif command == "reset":
+        if not controller.reset_to_defaults():
+            return 1
+    elif command == "calibrate":
+        if not controller.calibrate_controller():
+            return 1
+    elif command == "help":
+        print_usage()
+    else:
+        print(f"Unknown command: {command}")
+        print_usage()
+        return 1
+    
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main()) 

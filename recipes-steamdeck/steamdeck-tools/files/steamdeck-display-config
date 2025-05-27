@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""
+Steam Deck Display Configuration Tool
+
+This script handles Steam Deck display settings including resolution, refresh rate,
+and various display parameters.
+"""
+
+import sys
+import subprocess
+import os
+import json
+from pathlib import Path
+
+class SteamDeckDisplayConfig:
+    def __init__(self):
+        self.config_dir = Path("/etc/steamdeck")
+        self.config_file = self.config_dir / "display.json"
+        self.ensure_config_dir()
+    
+    def ensure_config_dir(self):
+        """Ensure configuration directory exists"""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+    
+    def load_config(self):
+        """Load display configuration"""
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+        return self.get_default_config()
+    
+    def get_default_config(self):
+        """Get default display configuration"""
+        return {
+            "internal_display": {
+                "resolution": "1280x800",
+                "refresh_rate": 60,
+                "brightness": 80,
+                "adaptive_brightness": True,
+                "color_temperature": 6500
+            },
+            "external_display": {
+                "auto_detect": True,
+                "preferred_resolution": "1920x1080",
+                "refresh_rate": 60,
+                "mirror_internal": False
+            },
+            "gaming_mode": {
+                "fsr_enabled": True,
+                "fsr_strength": 2,
+                "vsync": True,
+                "frame_limiter": 60
+            },
+            "power_saving": {
+                "dim_timeout": 300,
+                "sleep_timeout": 600,
+                "adaptive_refresh": True
+            }
+        }
+    
+    def save_config(self, config):
+        """Save display configuration"""
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            print(f"Configuration saved to {self.config_file}")
+            return True
+        except IOError as e:
+            print(f"Error saving configuration: {e}")
+            return False
+    
+    def get_connected_displays(self):
+        """Get list of connected displays"""
+        try:
+            result = subprocess.run(['xrandr', '--listmonitors'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')[1:]  # Skip header
+                displays = []
+                for line in lines:
+                    if line.strip():
+                        parts = line.split()
+                        if len(parts) >= 4:
+                            displays.append(parts[-1])  # Display name
+                return displays
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+        return ["eDP-1"]  # Default internal display
+    
+    def get_current_resolution(self, display="eDP-1"):
+        """Get current resolution for a display"""
+        try:
+            result = subprocess.run(['xrandr'], capture_output=True, text=True)
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if display in line and "connected" in line:
+                        # Parse current resolution from xrandr output
+                        for part in line.split():
+                            if 'x' in part and part.replace('x', '').replace('+', '').replace('*', '').isdigit():
+                                return part.split('+')[0].replace('*', '')
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+        return "1280x800"  # Default
+    
+    def set_resolution(self, display, resolution, refresh_rate=None):
+        """Set display resolution"""
+        try:
+            cmd = ['xrandr', '--output', display, '--mode', resolution]
+            if refresh_rate:
+                cmd.extend(['--rate', str(refresh_rate)])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"Resolution set to {resolution} for display {display}")
+                return True
+            else:
+                print(f"Error setting resolution: {result.stderr}")
+                return False
+        except (subprocess.SubprocessError, FileNotFoundError) as e:
+            print(f"Error running xrandr: {e}")
+            return False
+    
+    def set_brightness(self, brightness):
+        """Set display brightness (0-100)"""
+        brightness = max(10, min(100, brightness))  # Clamp between 10-100
+        brightness_value = brightness / 100.0
+        
+        try:
+            # Try multiple methods to set brightness
+            methods = [
+                ['xrandr', '--output', 'eDP-1', '--brightness', str(brightness_value)],
+                ['brightnessctl', 'set', f"{brightness}%"]
+            ]
+            
+            for method in methods:
+                try:
+                    result = subprocess.run(method, capture_output=True, text=True)
+                    if result.returncode == 0:
+                        print(f"Brightness set to {brightness}%")
+                        return True
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    continue
+            
+            # Fallback: write to sysfs
+            backlight_paths = [
+                "/sys/class/backlight/amdgpu_bl0/brightness",
+                "/sys/class/backlight/intel_backlight/brightness"
+            ]
+            
+            for path in backlight_paths:
+                if os.path.exists(path):
+                    max_brightness_path = os.path.dirname(path) + "/max_brightness"
+                    try:
+                        with open(max_brightness_path, 'r') as f:
+                            max_brightness = int(f.read().strip())
+                        
+                        target_brightness = int((brightness / 100.0) * max_brightness)
+                        
+                        with open(path, 'w') as f:
+                            f.write(str(target_brightness))
+                        
+                        print(f"Brightness set to {brightness}%")
+                        return True
+                    except (IOError, ValueError):
+                        continue
+            
+            print("Unable to set brightness")
+            return False
+            
+        except Exception as e:
+            print(f"Error setting brightness: {e}")
+            return False
+    
+    def enable_external_display(self, external_display, resolution="1920x1080"):
+        """Enable external display"""
+        try:
+            # Enable external display with specified resolution
+            cmd = ['xrandr', '--output', external_display, '--mode', resolution, 
+                   '--output', 'eDP-1', '--mode', '1280x800', '--left-of', external_display]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"External display {external_display} enabled at {resolution}")
+                return True
+            else:
+                print(f"Error enabling external display: {result.stderr}")
+                return False
+        except (subprocess.SubprocessError, FileNotFoundError) as e:
+            print(f"Error configuring external display: {e}")
+            return False
+    
+    def disable_external_displays(self):
+        """Disable all external displays"""
+        displays = self.get_connected_displays()
+        
+        for display in displays:
+            if display != "eDP-1":  # Don't disable internal display
+                try:
+                    subprocess.run(['xrandr', '--output', display, '--off'], 
+                                 capture_output=True)
+                except (subprocess.SubprocessError, FileNotFoundError):
+                    pass
+        
+        print("External displays disabled")
+        return True
+    
+    def show_status(self):
+        """Display current display status"""
+        config = self.load_config()
+        displays = self.get_connected_displays()
+        
+        print("Steam Deck Display Configuration:")
+        print(f"  Connected Displays: {', '.join(displays)}")
+        
+        for display in displays:
+            resolution = self.get_current_resolution(display)
+            print(f"  {display}: {resolution}")
+        
+        print(f"  Internal Display Config:")
+        internal = config["internal_display"]
+        print(f"    Resolution: {internal['resolution']}")
+        print(f"    Refresh Rate: {internal['refresh_rate']} Hz")
+        print(f"    Brightness: {internal['brightness']}%")
+        print(f"    Adaptive Brightness: {internal['adaptive_brightness']}")
+    
+    def apply_gaming_mode(self):
+        """Apply gaming mode display settings"""
+        config = self.load_config()
+        gaming = config["gaming_mode"]
+        
+        print("Applying gaming mode display settings...")
+        
+        # Set internal display to optimal gaming resolution
+        self.set_resolution("eDP-1", "1280x800", 60)
+        
+        # Disable external displays for better performance
+        self.disable_external_displays()
+        
+        print("Gaming mode applied")
+        return True
+    
+    def apply_desktop_mode(self):
+        """Apply desktop mode display settings"""
+        config = self.load_config()
+        
+        print("Applying desktop mode display settings...")
+        
+        # Enable external displays if available
+        displays = self.get_connected_displays()
+        external_displays = [d for d in displays if d != "eDP-1"]
+        
+        if external_displays:
+            for display in external_displays:
+                self.enable_external_display(display)
+        
+        print("Desktop mode applied")
+        return True
+
+def print_usage():
+    """Print usage information"""
+    print("Steam Deck Display Configuration Tool")
+    print("Usage: steamdeck-display-config [COMMAND] [OPTIONS]")
+    print("")
+    print("Commands:")
+    print("  status                    - Show current display status")
+    print("  resolution DISPLAY RES    - Set resolution (e.g., eDP-1 1280x800)")
+    print("  brightness LEVEL          - Set brightness (0-100)")
+    print("  gaming-mode               - Apply gaming mode settings")
+    print("  desktop-mode              - Apply desktop mode settings")
+    print("  list-displays             - List connected displays")
+    print("  help                      - Show this help message")
+
+def main():
+    """Main function"""
+    if len(sys.argv) < 2:
+        print_usage()
+        return 1
+    
+    command = sys.argv[1].lower()
+    display_config = SteamDeckDisplayConfig()
+    
+    if command == "status":
+        display_config.show_status()
+    elif command == "resolution":
+        if len(sys.argv) < 4:
+            print("Error: Display and resolution required")
+            print("Example: steamdeck-display-config resolution eDP-1 1280x800")
+            return 1
+        display = sys.argv[2]
+        resolution = sys.argv[3]
+        refresh_rate = sys.argv[4] if len(sys.argv) > 4 else None
+        if not display_config.set_resolution(display, resolution, refresh_rate):
+            return 1
+    elif command == "brightness":
+        if len(sys.argv) < 3:
+            print("Error: Brightness level required (0-100)")
+            return 1
+        try:
+            brightness = int(sys.argv[2])
+            if not display_config.set_brightness(brightness):
+                return 1
+        except ValueError:
+            print("Error: Brightness must be a number between 0-100")
+            return 1
+    elif command == "gaming-mode":
+        if not display_config.apply_gaming_mode():
+            return 1
+    elif command == "desktop-mode":
+        if not display_config.apply_desktop_mode():
+            return 1
+    elif command == "list-displays":
+        displays = display_config.get_connected_displays()
+        print("Connected displays:")
+        for display in displays:
+            resolution = display_config.get_current_resolution(display)
+            print(f"  {display}: {resolution}")
+    elif command == "help":
+        print_usage()
+    else:
+        print(f"Unknown command: {command}")
+        print_usage()
+        return 1
+    
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main()) 
