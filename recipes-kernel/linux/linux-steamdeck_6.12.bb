@@ -15,9 +15,6 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git;branch
            file://steamdeck-audio.cfg \
            file://steamdeck-input.cfg \
            file://steamdeck-power.cfg \
-           file://0001-steamdeck-oled-display-support.patch \
-           file://0002-steamdeck-audio-quirks.patch \
-           file://0003-steamdeck-controller-support.patch \
            "
 
 # Kernel config fragments
