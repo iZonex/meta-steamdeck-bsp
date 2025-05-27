@@ -348,7 +348,17 @@ bitbake-layers add-layer ../meta-openembedded/meta-networking
 
 If you still encounter this issue, ensure you're using the latest version of the BSP.
 
-#### 6. Build Directory Issues
+#### 6. Invalid IMAGE_FEATURE
+
+**Error**: `'autologin' in IMAGE_FEATURES is not a valid image feature`
+
+**Solution**: This has been fixed in the latest version. The invalid `autologin` IMAGE_FEATURE has been replaced with the correct `serial-autologin-root` feature. If you still encounter this issue:
+
+1. Ensure you're using the latest version of the BSP
+2. Check that your image recipes use valid IMAGE_FEATURES (see error message for list of valid features)
+3. For automatic root login, use `serial-autologin-root` and `empty-root-password` features
+
+#### 7. Build Directory Issues
 
 If BitBake can't find the build directory or configuration:
 ```bash
