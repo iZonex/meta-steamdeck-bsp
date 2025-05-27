@@ -337,7 +337,18 @@ CONNECTIVITY_CHECK_URIS = ""
 bitbake-layers add-layer ../meta-openembedded/meta-networking
 ```
 
-#### 5. Build Directory Issues
+#### 5. Missing Source Files
+
+**Error**: `Unable to get checksum for steamdeck-tools SRC_URI entry steamdeck-controller-config: file could not be found`
+
+**Solution**: This has been fixed in the latest version. The missing tool scripts have been added:
+- `steamdeck-controller-config` - Controller configuration and calibration
+- `steamdeck-power-management` - Power profiles and TDP control  
+- `steamdeck-display-config` - Display settings and external monitor support
+
+If you still encounter this issue, ensure you're using the latest version of the BSP.
+
+#### 6. Build Directory Issues
 
 If BitBake can't find the build directory or configuration:
 ```bash

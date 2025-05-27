@@ -135,6 +135,64 @@ steamdeck-recovery restore <backup_name>
 steamdeck-recovery dual-boot
 ```
 
+### Steam Deck System Tools
+
+The BSP includes specialized tools for managing Steam Deck hardware:
+
+#### Power Management
+```bash
+# Show current power status
+steamdeck-power-management status
+
+# Apply power profiles
+steamdeck-power-management profile performance  # Maximum performance
+steamdeck-power-management profile balanced     # Balanced power/performance  
+steamdeck-power-management profile powersave    # Battery saving mode
+
+# Run power monitoring service
+steamdeck-power-management monitor
+```
+
+#### Controller Configuration  
+```bash
+# Show current controller settings
+steamdeck-controller-config show
+
+# Reset to default settings
+steamdeck-controller-config reset
+
+# Run controller calibration
+steamdeck-controller-config calibrate
+```
+
+#### Display Configuration
+```bash
+# Show display status
+steamdeck-display-config status
+
+# Set brightness (0-100)
+steamdeck-display-config brightness 80
+
+# Set display resolution
+steamdeck-display-config resolution eDP-1 1280x800
+
+# Switch display modes
+steamdeck-display-config gaming-mode    # Optimized for gaming
+steamdeck-display-config desktop-mode   # Optimized for desktop use
+
+# List connected displays
+steamdeck-display-config list-displays
+```
+
+#### Fan Control
+```bash
+# Fan control runs automatically as a systemd service
+systemctl status steamdeck-fan-control
+
+# Manual control (advanced users)
+steamdeck-fan-control --help
+```
+
 ## System Architecture
 
 ### Partition Layout (Failsafe Mode)
