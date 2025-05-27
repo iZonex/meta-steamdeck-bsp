@@ -1,0 +1,42 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║                    STEAM DECK SYSTEM INSTALLER                    ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+Welcome to the Steam Deck System Installer!
+
+This installer will deploy a custom Linux system optimized specifically 
+for your Steam Deck OLED device.
+
+🎮 WHAT WILL BE INSTALLED:
+• Linux 6.12.x kernel with Steam Deck optimizations
+• AMD RDNA2 GPU drivers with full hardware acceleration
+• Optimized audio drivers for Steam Deck speakers/headphones
+• Power management for extended battery life
+• Gaming performance optimizations
+• Steam runtime and compatibility layers
+
+⚠️  IMPORTANT WARNINGS:
+• This will COMPLETELY ERASE your internal SSD
+• All existing data will be lost permanently
+• Make sure to backup important files first
+• The installation process cannot be undone
+
+🔧 INSTALLATION PROCESS:
+1. Detect and select target disk (usually /dev/nvme0n1)
+2. Choose installation type (minimal/gaming/custom)
+3. Create optimized partition layout
+4. Copy and configure system files
+5. Install systemd-boot bootloader
+6. Set up Steam Deck specific services
+
+⏱️  ESTIMATED TIME:
+• Minimal installation: 10-20 minutes
+• Full gaming installation: 20-45 minutes
+• Actual time depends on your SSD speed
+
+🆘 SUPPORT:
+If you encounter issues, check the console output for detailed
+error messages. The installer creates logs for troubleshooting.
+
+Press OK to continue with the installation wizard.
+Press Cancel or Ctrl+C to exit without making changes. 

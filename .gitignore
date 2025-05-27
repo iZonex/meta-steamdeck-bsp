@@ -1,0 +1,33 @@
+# Yocto build artifacts
+build*/
+tmp*/
+sstate-cache*/
+downloads*/
+cache*/
+
+# BitBake files
+*.pyc
+__pycache__/
+.git/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Generated files
+*.log
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+# Local configuration
+local.conf.bak
+auto.conf
+
+# Patches backup
+*.orig
+*.rej 

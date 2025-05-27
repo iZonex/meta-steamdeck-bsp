@@ -1,0 +1,15 @@
+define KMACHINE steamdeck-oled
+define KTYPE standard
+define KARCH x86_64
+
+# Include config fragments
+include steamdeck-hardware.cfg
+include steamdeck-graphics.cfg
+include steamdeck-audio.cfg
+include steamdeck-input.cfg
+include steamdeck-power.cfg
+
+# Apply patches
+patch 0001-steamdeck-oled-display-support.patch
+patch 0002-steamdeck-audio-quirks.patch
+patch 0003-steamdeck-controller-support.patch 

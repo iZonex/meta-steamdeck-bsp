@@ -1,0 +1,6 @@
+# Steam Deck OLED disk layout
+# EFI boot partition
+part /boot --source bootimg-efi --sourceparams="loader=systemd-boot" --label boot --active --align 1024 --size 256
+
+# Root filesystem
+part / --source rootfs --ondisk sda --fstype=ext4 --label rootfs --align 1024 --size 8192 --extra-space 2048 
