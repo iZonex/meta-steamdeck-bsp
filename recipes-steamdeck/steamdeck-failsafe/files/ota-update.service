@@ -1,0 +1,16 @@
+[Unit]
+Description=Steam Deck OTA Update Service
+Documentation=https://github.com/iZonex/meta-steamdeck-bsp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/steamdeck-ota-update auto
+StandardOutput=journal
+StandardError=journal
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target 

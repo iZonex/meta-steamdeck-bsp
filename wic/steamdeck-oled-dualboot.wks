@@ -1,0 +1,25 @@
+# Steam Deck OLED Dual Boot + Failsafe Layout
+# This layout supports:
+# - Dual boot with original SteamOS (if preserved)
+# - A/B root partitions for failsafe updates
+# - Shared EFI partition for multiple OS
+# - Recovery partition for emergencies
+
+# Shared EFI boot partition (larger for multiple systems)
+part /boot --source bootimg-efi --sourceparams="loader=systemd-boot" --label shared-efi --active --align 1024 --size 1024
+
+# A/B root partitions for failsafe updates
+part / --source rootfs --ondisk sda --fstype=ext4 --label rootfs-a --align 1024 --size 8192 --extra-space 2048
+part --ondisk sda --fstype=ext4 --label rootfs-b --align 1024 --size 8192
+
+# Shared swap partition
+part --ondisk sda --fstype=swap --label shared-swap --align 1024 --size 4096
+
+# Recovery partition with tools and backup images
+part --ondisk sda --fstype=ext4 --label recovery --align 1024 --size 2048
+
+# Shared data partition (for Steam games, user data)
+part --ondisk sda --fstype=ext4 --label shared-data --align 1024 --size 16384
+
+# Reserve space for original SteamOS (if user wants to keep it)
+# part --ondisk sda --fstype=ext4 --label steamos-root --align 1024 --size 8192 

@@ -1,0 +1,18 @@
+# Steam Deck A/B System udev rules
+# Automatically detect and configure A/B partitions
+
+# Detect Steam Deck OLED device
+SUBSYSTEM=="dmi", ATTR{sys_vendor}=="Valve", ATTR{product_name}=="Jupiter", TAG+="steamdeck"
+
+# Set up A/B partition labels on first boot
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="nvme0n1p2", ATTR{partition}=="2", \
+    TEST!="/etc/steamdeck-ab/initialized", \
+    RUN+="/bin/bash -c 'e2label /dev/nvme0n1p2 rootfs-a && touch /etc/steamdeck-ab/initialized'"
+
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="nvme0n1p3", ATTR{partition}=="3", \
+    TEST!="/etc/steamdeck-ab/initialized", \
+    RUN+="/bin/bash -c 'e2label /dev/nvme0n1p3 rootfs-b'"
+
+# Mark successful boot on login
+ACTION=="add", SUBSYSTEM=="tty", KERNEL=="tty1", \
+    RUN+="/usr/bin/systemd-run --on-calendar='*:*:30' /usr/bin/steamdeck-ab-manager mark-successful" 

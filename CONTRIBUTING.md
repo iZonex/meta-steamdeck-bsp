@@ -3,11 +3,13 @@
 Thank you for your interest in contributing to the Steam Deck BSP project! 🎮
 
 ## 🔗 Repository
+
 **GitHub:** [https://github.com/iZonex/meta-steamdeck-bsp](https://github.com/iZonex/meta-steamdeck-bsp)
 
 ## 🚀 Quick Start for Contributors
 
 ### 1. Fork and Clone
+
 ```bash
 # Fork the repository on GitHub, then clone your fork
 git clone https://github.com/YOUR_USERNAME/meta-steamdeck-bsp.git
@@ -18,6 +20,7 @@ git remote add upstream https://github.com/iZonex/meta-steamdeck-bsp.git
 ```
 
 ### 2. Development Setup
+
 ```bash
 # Create feature branch
 git checkout -b feature/your-feature-name
@@ -31,6 +34,7 @@ source oe-init-build-env build-steamdeck
 ```
 
 ### 3. Making Changes
+
 ```bash
 # Make your changes in meta-steamdeck-bsp/
 # Test your changes by building
@@ -43,6 +47,7 @@ git push origin feature/your-feature-name
 ```
 
 ### 4. Submit Pull Request
+
 1. Go to GitHub and create a Pull Request
 2. Describe your changes thoroughly
 3. Reference any related issues
@@ -50,6 +55,7 @@ git push origin feature/your-feature-name
 ## 📝 Contribution Guidelines
 
 ### What We Accept
+
 - **Bug fixes** - Hardware support improvements
 - **New hardware support** - Additional Steam Deck variants
 - **Performance optimizations** - Gaming/power management improvements  
@@ -58,12 +64,14 @@ git push origin feature/your-feature-name
 - **Installer improvements** - Better user experience
 
 ### Coding Standards
+
 - **BitBake recipes** - Follow Yocto Project conventions
 - **Shell scripts** - Use bash with proper error handling
 - **Configuration files** - Clear comments explaining purpose
 - **Documentation** - Update relevant .md files with changes
 
 ### Testing Requirements
+
 - Test on actual Steam Deck hardware when possible
 - Verify installer functionality
 - Ensure all images build successfully
@@ -72,11 +80,13 @@ git push origin feature/your-feature-name
 ## 🐛 Reporting Issues
 
 ### Before Reporting
+
 1. Check existing issues on GitHub
 2. Test with latest main branch
 3. Try with clean build environment
 
 ### Issue Template
+
 ```markdown
 **Hardware:** Steam Deck OLED/LCD
 **Image:** steamdeck-minimal-image / steamdeck-image / steamdeck-installer-image
@@ -104,6 +114,7 @@ git push origin feature/your-feature-name
 ## 🔧 Development Areas
 
 ### Priority Areas
+
 - **Hardware support** - WiFi, Bluetooth, sensors
 - **Performance tuning** - Gaming optimizations
 - **Power management** - Battery life improvements
@@ -111,6 +122,7 @@ git push origin feature/your-feature-name
 - **Audio enhancements** - Spatial audio, EQ presets
 
 ### Architecture
+
 ```
 meta-steamdeck-bsp/
 ├── conf/                    # Layer and machine configuration
@@ -123,11 +135,13 @@ meta-steamdeck-bsp/
 ## 📚 Resources
 
 ### Documentation
+
 - [Yocto Project Manual](https://docs.yoctoproject.org/)
 - [BitBake User Manual](https://docs.yoctoproject.org/bitbake/)
 - [Steam Deck Developer Documentation](https://partner.steamgames.com/doc/steamdeck)
 
 ### Steam Deck Hardware
+
 - **CPU:** AMD Zen 2 4-core/8-thread (Van Gogh APU)
 - **GPU:** AMD RDNA 2 (8 CUs, 1.0-1.6 GHz)
 - **RAM:** 16 GB LPDDR5
@@ -137,11 +151,13 @@ meta-steamdeck-bsp/
 ## 🤝 Community
 
 ### Communication
+
 - **Issues:** GitHub Issues for bug reports and feature requests
 - **Discussions:** GitHub Discussions for general questions
 - **Pull Requests:** For code contributions
 
 ### Code of Conduct
+
 - Be respectful and inclusive
 - Focus on constructive feedback
 - Help newcomers to the project
@@ -153,4 +169,4 @@ By contributing to this project, you agree that your contributions will be licen
 
 ---
 
-**Happy hacking!** 🚀 
+**Happy hacking!** 🚀

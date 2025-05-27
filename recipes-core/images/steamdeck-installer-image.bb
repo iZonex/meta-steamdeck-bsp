@@ -1,34 +1,80 @@
-SUMMARY = "Steam Deck OLED installer image"
-DESCRIPTION = "Installer image to deploy Steam Deck system to internal SSD"
+SUMMARY = "Steam Deck Installer Image"
+DESCRIPTION = "Bootable installer image for Steam Deck Linux with failsafe and dual boot support"
 
 require steamdeck-minimal-image.bb
 
 # Installer specific packages
 IMAGE_INSTALL += " \
     steamdeck-installer \
+    steamdeck-failsafe \
+    auto-login-installer \
     parted \
-    e2fsprogs \
+    gptfdisk \
     dosfstools \
-    util-linux \
+    e2fsprogs \
     rsync \
-    pv \
     dialog \
-    ncurses \
-    bash \
+    pv \
+    bmaptool \
+    tar \
+    gzip \
+    bzip2 \
+    xz \
 "
 
-# Remove some packages to keep installer small
+# System utilities for installation
+IMAGE_INSTALL += " \
+    util-linux \
+    coreutils \
+    findutils \
+    grep \
+    sed \
+    gawk \
+    which \
+    file \
+    lsof \
+    psmisc \
+"
+
+# Hardware detection and management
+IMAGE_INSTALL += " \
+    udev \
+    usbutils \
+    pciutils \
+    dmidecode \
+    lshw \
+    hdparm \
+    smartmontools \
+"
+
+# Network tools for OTA updates
+IMAGE_INSTALL += " \
+    wget \
+    curl \
+    ca-certificates \
+    openssl \
+"
+
+# Remove packages not needed for installer
 IMAGE_INSTALL:remove = " \
-    steamdeck-tools \
+    packagegroup-core-boot \
+    kernel-modules \
+    linux-firmware-amdgpu \
+    linux-firmware-rtw89 \
+    steamdeck-firmware \
+    mesa \
+    mesa-drivers \
+    alsa-utils \
+    pulseaudio \
 "
 
-# Installer features
-IMAGE_FEATURES += "splash"
+# Keep installer image smaller
+IMAGE_ROOTFS_EXTRA_SPACE = "524288"
 
-# Smaller image for installer
-IMAGE_ROOTFS_EXTRA_SPACE = "512000"
+# Enable installer auto-login
+IMAGE_FEATURES += "autologin"
 
-# Auto-login for installer
-IMAGE_INSTALL += "auto-login-installer"
+# Use WIC for bootable USB creation
+WKS_FILE = "steamdeck-installer.wks"
 
 COMPATIBLE_MACHINE = "steamdeck-oled" 

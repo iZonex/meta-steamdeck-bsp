@@ -1,113 +1,215 @@
-# meta-steamdeck-bsp
+# Steam Deck OLED BSP
 
-Board Support Package (BSP) layer for Steam Deck OLED based on Yocto Project.
+A comprehensive Board Support Package (BSP) for Steam Deck OLED using Yocto Project, featuring advanced failsafe systems and dual boot capabilities.
 
-**🆕 Updated to latest versions:** Linux 6.12.x, Yocto Scarthgap (5.0), following [official Yocto recipe versions](https://wiki.yoctoproject.org/wiki/Recipe_Versions).
+## Features
 
-**🔗 GitHub Repository:** [https://github.com/iZonex/meta-steamdeck-bsp](https://github.com/iZonex/meta-steamdeck-bsp)
+### Core System
 
-## Overview
+- **Linux Kernel 6.12.x** with Steam Deck optimizations
+- **AMD Van Gogh APU** support (Zen 2 + RDNA2)
+- **OLED Display** with proper color management
+- **Audio subsystem** with enhanced DSP support
+- **WiFi 6E and Bluetooth** connectivity
+- **Gaming controls** and haptic feedback
 
-This meta-layer provides hardware support for Steam Deck OLED devices, including:
+### Advanced Failsafe System
 
-- AMD Van Gogh APU (Zen 2 CPU + RDNA 2 GPU) support
-- OLED display configuration
-- Audio subsystem (speakers, microphone, audio jack)
-- Wireless connectivity (WiFi 6E, Bluetooth)
-- Input devices (gamepad controls, touchscreen, trackpads)
-- Power management optimizations
-- Steam runtime integration
+- **A/B Root Partitions** for safe system updates
+- **Automatic Rollback** on boot failure (max 3 attempts)
+- **OTA Updates** with verification and safety checks
+- **Recovery Partition** with backup/restore tools
+- **Shared Data Partition** for games and user data
+
+### Dual Boot Support
+
+- **SteamOS Preservation** during installation
+- **Boot Menu** with 10-second timeout
+- **Shared EFI Partition** for multiple operating systems
+- **Automatic Detection** of existing installations
+
+### Installation Modes
+
+1. **Failsafe Mode** (Recommended) - A/B system with automatic rollback
+2. **Dual Boot Mode** - Failsafe + SteamOS preservation
+3. **Simple Mode** - Traditional single partition setup
 
 ## Quick Start
 
-### Prerequisites
-
-- Yocto Project (Scarthgap 5.0 or newer)
-- Host system with required dependencies
-
-### Building
+### Building Images
 
 ```bash
-# Clone poky
-git clone -b scarthgap git://git.yoctoproject.org/poky
-cd poky
-
-# Clone this meta-layer
+# Clone the repository
 git clone https://github.com/iZonex/meta-steamdeck-bsp.git
+cd meta-steamdeck-bsp
 
-# Initialize build environment
-source oe-init-build-env build-steamdeck
+# Initialize Yocto environment
+source oe-init-build-env build
 
-# Add meta-steamdeck-bsp to bblayers.conf
-echo 'BBLAYERS += "${TOPDIR}/../meta-steamdeck-bsp"' >> conf/bblayers.conf
+# Add the BSP layer
+bitbake-layers add-layer ../meta-steamdeck-bsp
 
-# Set machine in local.conf
+# Set machine configuration
 echo 'MACHINE = "steamdeck-oled"' >> conf/local.conf
 
-# Build image
-bitbake steamdeck-image
+# Build images
+bitbake steamdeck-image                    # Full gaming system
+bitbake steamdeck-minimal-image           # Minimal console system
+bitbake steamdeck-installer-image         # Interactive installer
 ```
 
-## Supported Machines
+### Installation Options
 
-- `steamdeck-oled` - Steam Deck OLED model
+#### Option 1: Interactive Installer (Recommended)
 
-## Images
+1. Flash `steamdeck-installer-image` to USB drive
+2. Boot Steam Deck from USB
+3. Follow interactive installer prompts
+4. Choose installation mode (failsafe/dualboot/simple)
 
-### 🔥 **Ready-to-Flash Bootable Images**
-
-All images create complete disk images that can be directly flashed to USB drives:
-
-- **`steamdeck-minimal-image`** - Minimal base system (~2-4 GB)
-  - Console-only environment
-  - SSH access, basic tools
-  - Hardware drivers and firmware
-  - Perfect for development/testing
-
-- **`steamdeck-image`** - Full gaming-optimized image (~8-12 GB)
-  - Complete desktop environment
-  - Steam client pre-installed
-  - Gaming tools (Wine, Lutris, MangoHUD)
-  - Multimedia support
-
-- **`steamdeck-installer-image`** - Interactive installer (~1-2 GB) ⭐ **NEW!**
-  - Bootable installer with GUI interface
-  - Installs system to internal SSD
-  - Multiple installation options
-  - Auto-detects Steam Deck hardware
-
-### 💾 **Installation Methods**
-
-#### Live USB (Boot from external drive)
+#### Option 2: Direct Image Deployment
 
 ```bash
-# Flash any image to USB drive
-sudo bmaptool copy steamdeck-minimal-image-steamdeck-oled.wic.bmap /dev/sdX
-# Boot Steam Deck from USB (Volume Down + Power → Select USB)
+# Flash complete system image
+sudo bmaptool copy steamdeck-image.wic.bz2 /dev/sdX
 ```
 
-#### Install to Internal SSD ⭐ **NEW!**
+#### Option 3: Manual Installation
+
+See [BUILD.md](BUILD.md) for detailed manual installation instructions.
+
+## Failsafe System Usage
+
+### A/B System Management
 
 ```bash
-# Flash installer to USB
-sudo bmaptool copy steamdeck-installer-image-steamdeck-oled.wic.bmap /dev/sdX
-# Boot from USB → Installer will guide you through installation to internal SSD
+# Check system status
+steamdeck-ab-manager status
+
+# Force rollback to previous version
+steamdeck-ab-manager rollback
+
+# Mark current boot as successful
+steamdeck-ab-manager mark-successful
 ```
 
-## File Formats
+### OTA Updates
 
-Each build produces multiple formats:
+```bash
+# Interactive update process
+steamdeck-ota-update
 
-- **`.wic`** - Complete disk image (use this for flashing)
-- **`.wic.bmap`** - Block map for fast flashing with bmaptool
-- **`.ext4`** - Root filesystem only
+# Check for updates only
+steamdeck-ota-update check
+
+# Download and install updates
+steamdeck-ota-update download
+steamdeck-ota-update install
+```
+
+### Recovery Tools
+
+```bash
+# Launch recovery menu
+steamdeck-recovery menu
+
+# Create system backup
+steamdeck-recovery backup current
+
+# Restore from backup
+steamdeck-recovery restore <backup_name>
+
+# Setup dual boot
+steamdeck-recovery dual-boot
+```
+
+## System Architecture
+
+### Partition Layout (Failsafe Mode)
+
+```
+/dev/nvme0n1p1  1GB     EFI Boot (shared)
+/dev/nvme0n1p2  8GB     Root A (active)
+/dev/nvme0n1p3  8GB     Root B (standby)
+/dev/nvme0n1p4  4GB     Swap (shared)
+/dev/nvme0n1p5  2GB     Recovery
+/dev/nvme0n1p6  16GB+   Data (shared)
+/dev/nvme0n1p7  8GB     SteamOS (dual boot only)
+```
+
+### Boot Process
+
+1. **systemd-boot** loads from shared EFI partition
+2. **A/B Manager** checks boot count and health
+3. **Automatic rollback** if boot fails 3 times
+4. **Update verification** after successful boot
+
+## Hardware Support
+
+- **CPU**: AMD Van Gogh (Zen 2 cores)
+- **GPU**: RDNA2 integrated graphics
+- **Display**: 7" OLED 1280x800 HDR
+- **Audio**: Enhanced DSP with spatial audio
+- **Storage**: NVMe SSD (64GB/256GB/512GB/1TB)
+- **Connectivity**: WiFi 6E, Bluetooth 5.3
+- **Controls**: Steam Input with haptics
+- **Sensors**: Gyroscope, accelerometer
+
+## Development
+
+### Adding Custom Packages
+
+```bash
+# Create new recipe
+recipes-custom/mypackage/mypackage_1.0.bb
+
+# Add to image
+IMAGE_INSTALL += "mypackage"
+```
+
+### Kernel Modifications
+
+```bash
+# Kernel configuration
+recipes-kernel/linux/linux-steamdeck/defconfig
+
+# Device tree
+recipes-kernel/linux/linux-steamdeck/steamdeck-oled.dts
+```
+
+## Safety Features
+
+### Automatic Rollback
+
+- Boot failure detection after 3 attempts
+- Automatic switch to previous working slot
+- System health verification
+- Recovery partition access
+
+### Update Safety
+
+- Downloads verified with SHA256 checksums
+- Updates applied to inactive slot first
+- System verification before switching
+- Automatic rollback on verification failure
+
+### Data Protection
+
+- Shared data partition preserved during updates
+- Automatic backups before major changes
+- Recovery tools for emergency situations
+- Dual boot preservation of original OS
 
 ## Contributing
 
-Please submit issues and pull requests to improve hardware support.
-
-**GitHub Repository:** [https://github.com/iZonex/meta-steamdeck-bsp](https://github.com/iZonex/meta-steamdeck-bsp)
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/iZonex/meta-steamdeck-bsp/issues)
+- **Documentation**: [Build Guide](BUILD.md)
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)

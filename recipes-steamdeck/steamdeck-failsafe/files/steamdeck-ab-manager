@@ -1,0 +1,395 @@
+#!/bin/bash
+#
+# Steam Deck A/B Partition Manager
+# Manages A/B root partitions for failsafe updates and rollback
+#
+
+set -e
+
+VERSION="1.0.0"
+CONFIG_DIR="/etc/steamdeck-ab"
+STATE_DIR="/var/lib/steamdeck-ab"
+LOG_FILE="/var/log/steamdeck-ab.log"
+
+# Configuration
+CURRENT_SLOT_FILE="$CONFIG_DIR/current-slot"
+BOOT_COUNT_FILE="$CONFIG_DIR/boot-count"
+CONFIG_FILE="$CONFIG_DIR/config"
+
+# Default configuration
+MAX_BOOT_ATTEMPTS=3
+ROLLBACK_ENABLED=1
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Logging function
+log() {
+    local level="$1"
+    shift
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+}
+
+info() { log "INFO" "$@"; }
+warn() { log "WARN" "$@"; }
+error() { log "ERROR" "$@"; }
+success() { log "SUCCESS" "$@"; }
+
+# Load configuration
+load_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+    fi
+    
+    if [ -f "$CURRENT_SLOT_FILE" ]; then
+        CURRENT_SLOT=$(cat "$CURRENT_SLOT_FILE")
+    else
+        CURRENT_SLOT="a"
+        echo "$CURRENT_SLOT" > "$CURRENT_SLOT_FILE"
+    fi
+    
+    if [ -f "$BOOT_COUNT_FILE" ]; then
+        BOOT_COUNT=$(cat "$BOOT_COUNT_FILE")
+    else
+        BOOT_COUNT=0
+        echo "$BOOT_COUNT" > "$BOOT_COUNT_FILE"
+    fi
+}
+
+# Save configuration
+save_config() {
+    echo "$CURRENT_SLOT" > "$CURRENT_SLOT_FILE"
+    echo "$BOOT_COUNT" > "$BOOT_COUNT_FILE"
+}
+
+# Get partition information
+get_partition_info() {
+    local target_disk=$(lsblk -ndo NAME,TYPE | grep disk | head -1 | cut -d' ' -f1)
+    if [[ "$target_disk" =~ "nvme" ]]; then
+        DISK_PREFIX="/dev/${target_disk}p"
+    else
+        DISK_PREFIX="/dev/${target_disk}"
+    fi
+    
+    # Define partition layout
+    EFI_PART="${DISK_PREFIX}1"
+    ROOT_A_PART="${DISK_PREFIX}2"
+    ROOT_B_PART="${DISK_PREFIX}3"
+    SWAP_PART="${DISK_PREFIX}4"
+    RECOVERY_PART="${DISK_PREFIX}5"
+    DATA_PART="${DISK_PREFIX}6"
+}
+
+# Check partition health
+check_partition_health() {
+    local partition="$1"
+    local label="$2"
+    
+    if [ ! -b "$partition" ]; then
+        error "Partition $partition ($label) does not exist!"
+        return 1
+    fi
+    
+    # Check filesystem
+    if ! fsck -n "$partition" >/dev/null 2>&1; then
+        warn "Filesystem issues detected on $partition ($label)"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Get other slot (toggle between a and b)
+get_other_slot() {
+    if [ "$CURRENT_SLOT" = "a" ]; then
+        echo "b"
+    else
+        echo "a"
+    fi
+}
+
+# Get partition for slot
+get_slot_partition() {
+    local slot="$1"
+    if [ "$slot" = "a" ]; then
+        echo "$ROOT_A_PART"
+    else
+        echo "$ROOT_B_PART"
+    fi
+}
+
+# Check if system booted successfully
+check_boot_success() {
+    # Increment boot count
+    BOOT_COUNT=$((BOOT_COUNT + 1))
+    save_config
+    
+    info "Boot attempt $BOOT_COUNT for slot $CURRENT_SLOT"
+    
+    if [ "$BOOT_COUNT" -ge "$MAX_BOOT_ATTEMPTS" ] && [ "$ROLLBACK_ENABLED" = "1" ]; then
+        warn "Maximum boot attempts reached for slot $CURRENT_SLOT"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Mark boot as successful
+mark_boot_successful() {
+    BOOT_COUNT=0
+    save_config
+    success "Boot marked as successful for slot $CURRENT_SLOT"
+}
+
+# Perform rollback to other slot
+perform_rollback() {
+    local other_slot=$(get_other_slot)
+    local other_partition=$(get_slot_partition "$other_slot")
+    
+    warn "Performing rollback from slot $CURRENT_SLOT to slot $other_slot"
+    
+    # Check if other slot is available
+    if ! check_partition_health "$other_partition" "rootfs-$other_slot"; then
+        error "Cannot rollback: slot $other_slot is not healthy!"
+        return 1
+    fi
+    
+    # Update boot configuration
+    update_boot_config "$other_slot"
+    
+    # Switch to other slot
+    CURRENT_SLOT="$other_slot"
+    BOOT_COUNT=0
+    save_config
+    
+    success "Rollback completed. System will boot from slot $CURRENT_SLOT"
+    
+    # Schedule reboot
+    systemctl reboot
+}
+
+# Update systemd-boot configuration
+update_boot_config() {
+    local slot="$1"
+    local boot_dir="/boot"
+    
+    info "Updating boot configuration for slot $slot"
+    
+    # Create boot entry for the slot
+    cat > "$boot_dir/loader/entries/steamdeck-$slot.conf" << EOF
+title Steam Deck Linux (Slot $slot)
+linux /vmlinuz-*
+initrd /initramfs-*
+options root=LABEL=rootfs-$slot rw quiet splash plymouth.ignore-serial-consoles
+EOF
+    
+    # Update default boot entry
+    cat > "$boot_dir/loader/loader.conf" << EOF
+default steamdeck-$slot.conf
+timeout 5
+console-mode max
+editor no
+EOF
+    
+    success "Boot configuration updated for slot $slot"
+}
+
+# Prepare slot for update
+prepare_update_slot() {
+    local target_slot=$(get_other_slot)
+    local target_partition=$(get_slot_partition "$target_slot")
+    
+    info "Preparing slot $target_slot for update"
+    
+    # Unmount if mounted
+    umount "$target_partition" 2>/dev/null || true
+    
+    # Format the target partition
+    info "Formatting partition $target_partition"
+    mkfs.ext4 -F -L "rootfs-$target_slot" "$target_partition"
+    
+    success "Slot $target_slot prepared for update"
+    echo "$target_slot"
+}
+
+# Apply update to prepared slot
+apply_update() {
+    local update_file="$1"
+    local target_slot="$2"
+    local target_partition=$(get_slot_partition "$target_slot")
+    local mount_point="/mnt/update-$target_slot"
+    
+    info "Applying update to slot $target_slot"
+    
+    # Create mount point and mount
+    mkdir -p "$mount_point"
+    mount "$target_partition" "$mount_point"
+    
+    # Extract update
+    if [[ "$update_file" =~ \.tar\.gz$ ]] || [[ "$update_file" =~ \.tgz$ ]]; then
+        tar -xzf "$update_file" -C "$mount_point"
+    elif [[ "$update_file" =~ \.tar\.bz2$ ]]; then
+        tar -xjf "$update_file" -C "$mount_point"
+    elif [[ "$update_file" =~ \.tar\.xz$ ]]; then
+        tar -xJf "$update_file" -C "$mount_point"
+    else
+        error "Unsupported update file format: $update_file"
+        umount "$mount_point"
+        return 1
+    fi
+    
+    # Update fstab for the new slot
+    update_fstab "$mount_point" "$target_slot"
+    
+    # Sync and unmount
+    sync
+    umount "$mount_point"
+    rmdir "$mount_point"
+    
+    success "Update applied to slot $target_slot"
+}
+
+# Update fstab for specific slot
+update_fstab() {
+    local root_dir="$1"
+    local slot="$2"
+    
+    cat > "$root_dir/etc/fstab" << EOF
+# Steam Deck A/B system fstab
+LABEL=rootfs-$slot / ext4 defaults,noatime 0 1
+LABEL=shared-efi /boot vfat defaults,noatime 0 2
+LABEL=shared-swap none swap sw 0 0
+LABEL=shared-data /home/deck ext4 defaults,noatime 0 2
+EOF
+}
+
+# Switch to updated slot
+switch_to_slot() {
+    local target_slot="$1"
+    
+    info "Switching to slot $target_slot"
+    
+    # Update boot configuration
+    update_boot_config "$target_slot"
+    
+    # Update current slot
+    CURRENT_SLOT="$target_slot"
+    BOOT_COUNT=0
+    save_config
+    
+    success "System will boot from slot $CURRENT_SLOT on next reboot"
+}
+
+# Show system status
+show_status() {
+    echo -e "${BLUE}Steam Deck A/B System Status${NC}"
+    echo "================================"
+    echo "Current Slot: $CURRENT_SLOT"
+    echo "Boot Count: $BOOT_COUNT"
+    echo "Max Boot Attempts: $MAX_BOOT_ATTEMPTS"
+    echo "Rollback Enabled: $ROLLBACK_ENABLED"
+    echo ""
+    
+    # Show partition information
+    get_partition_info
+    echo "Partition Layout:"
+    echo "  EFI: $EFI_PART"
+    echo "  Root A: $ROOT_A_PART"
+    echo "  Root B: $ROOT_B_PART"
+    echo "  Swap: $SWAP_PART"
+    echo "  Recovery: $RECOVERY_PART"
+    echo "  Data: $DATA_PART"
+    echo ""
+    
+    # Check partition health
+    echo "Partition Health:"
+    if check_partition_health "$ROOT_A_PART" "rootfs-a"; then
+        echo -e "  Slot A: ${GREEN}OK${NC}"
+    else
+        echo -e "  Slot A: ${RED}ERROR${NC}"
+    fi
+    
+    if check_partition_health "$ROOT_B_PART" "rootfs-b"; then
+        echo -e "  Slot B: ${GREEN}OK${NC}"
+    else
+        echo -e "  Slot B: ${RED}ERROR${NC}"
+    fi
+}
+
+# Main command handling
+case "${1:-status}" in
+    "status")
+        load_config
+        get_partition_info
+        show_status
+        ;;
+    
+    "check-boot")
+        load_config
+        get_partition_info
+        if ! check_boot_success; then
+            perform_rollback
+        fi
+        ;;
+    
+    "mark-successful")
+        load_config
+        mark_boot_successful
+        ;;
+    
+    "rollback")
+        load_config
+        get_partition_info
+        perform_rollback
+        ;;
+    
+    "prepare-update")
+        load_config
+        get_partition_info
+        prepare_update_slot
+        ;;
+    
+    "apply-update")
+        if [ -z "$2" ]; then
+            error "Usage: $0 apply-update <update_file> [target_slot]"
+            exit 1
+        fi
+        load_config
+        get_partition_info
+        target_slot="${3:-$(get_other_slot)}"
+        apply_update "$2" "$target_slot"
+        ;;
+    
+    "switch")
+        if [ -z "$2" ]; then
+            error "Usage: $0 switch <slot>"
+            exit 1
+        fi
+        load_config
+        get_partition_info
+        switch_to_slot "$2"
+        ;;
+    
+    "version")
+        echo "steamdeck-ab-manager version $VERSION"
+        ;;
+    
+    *)
+        echo "Usage: $0 {status|check-boot|mark-successful|rollback|prepare-update|apply-update|switch|version}"
+        echo ""
+        echo "Commands:"
+        echo "  status          - Show A/B system status"
+        echo "  check-boot      - Check if boot was successful, rollback if needed"
+        echo "  mark-successful - Mark current boot as successful"
+        echo "  rollback        - Force rollback to other slot"
+        echo "  prepare-update  - Prepare other slot for update"
+        echo "  apply-update    - Apply update file to slot"
+        echo "  switch          - Switch to specified slot"
+        echo "  version         - Show version information"
+        exit 1
+        ;;
+esac 

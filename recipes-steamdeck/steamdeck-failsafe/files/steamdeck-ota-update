@@ -1,0 +1,414 @@
+#!/bin/bash
+#
+# Steam Deck OTA Update System
+# Safe over-the-air updates with automatic rollback
+#
+
+set -e
+
+VERSION="1.0.0"
+UPDATE_SERVER="${UPDATE_SERVER:-https://updates.steamdeck-linux.org}"
+UPDATE_CHANNEL="${UPDATE_CHANNEL:-stable}"
+LOCAL_UPDATE_DIR="/var/lib/steamdeck-updates"
+LOG_FILE="/var/log/steamdeck-ota.log"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Logging
+log() {
+    local level="$1"
+    shift
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+}
+
+info() { log "INFO" "$@"; }
+warn() { log "WARN" "$@"; }
+error() { log "ERROR" "$@"; }
+success() { log "SUCCESS" "$@"; }
+
+# Download progress callback
+download_progress() {
+    local percentage="$1"
+    printf "\rDownloading update: %s%%" "$percentage"
+}
+
+# Check for updates
+check_updates() {
+    info "Checking for updates..."
+    
+    # Get current version
+    local current_version
+    if [ -f "/etc/steamdeck-version" ]; then
+        current_version=$(cat /etc/steamdeck-version)
+    else
+        current_version="unknown"
+    fi
+    
+    info "Current version: $current_version"
+    info "Update channel: $UPDATE_CHANNEL"
+    
+    # Query update server
+    local update_info
+    update_info=$(curl -s "${UPDATE_SERVER}/api/v1/check-update" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"current_version\": \"$current_version\",
+            \"channel\": \"$UPDATE_CHANNEL\",
+            \"hardware\": \"steamdeck-oled\"
+        }" || echo "{}")
+    
+    if [ "$update_info" = "{}" ]; then
+        warn "Unable to contact update server"
+        return 1
+    fi
+    
+    # Parse response
+    local available=$(echo "$update_info" | jq -r '.update_available // false')
+    if [ "$available" = "true" ]; then
+        local new_version=$(echo "$update_info" | jq -r '.version')
+        local download_url=$(echo "$update_info" | jq -r '.download_url')
+        local file_size=$(echo "$update_info" | jq -r '.file_size')
+        local checksum=$(echo "$update_info" | jq -r '.sha256')
+        
+        info "Update available: $new_version"
+        info "Size: $file_size bytes"
+        
+        echo "$update_info" > "$LOCAL_UPDATE_DIR/pending-update.json"
+        return 0
+    else
+        info "No updates available"
+        return 1
+    fi
+}
+
+# Download update
+download_update() {
+    info "Downloading update..."
+    
+    if [ ! -f "$LOCAL_UPDATE_DIR/pending-update.json" ]; then
+        error "No pending update found"
+        return 1
+    fi
+    
+    local update_info=$(cat "$LOCAL_UPDATE_DIR/pending-update.json")
+    local download_url=$(echo "$update_info" | jq -r '.download_url')
+    local checksum=$(echo "$update_info" | jq -r '.sha256')
+    local filename=$(basename "$download_url")
+    local download_path="$LOCAL_UPDATE_DIR/$filename"
+    
+    # Create directory
+    mkdir -p "$LOCAL_UPDATE_DIR"
+    
+    # Download with progress
+    info "Downloading from: $download_url"
+    if wget -O "$download_path" --progress=bar:force "$download_url" 2>&1 | \
+       grep -o '[0-9]*%' | while read -r percent; do
+           download_progress "${percent%?}"
+       done; then
+        echo ""  # New line after progress
+        success "Download completed"
+    else
+        error "Download failed"
+        rm -f "$download_path"
+        return 1
+    fi
+    
+    # Verify checksum
+    info "Verifying checksum..."
+    local actual_checksum=$(sha256sum "$download_path" | cut -d' ' -f1)
+    if [ "$actual_checksum" = "$checksum" ]; then
+        success "Checksum verified"
+        echo "$download_path" > "$LOCAL_UPDATE_DIR/downloaded-update.path"
+        return 0
+    else
+        error "Checksum mismatch!"
+        error "Expected: $checksum"
+        error "Actual: $actual_checksum"
+        rm -f "$download_path"
+        return 1
+    fi
+}
+
+# Install update
+install_update() {
+    info "Installing update..."
+    
+    if [ ! -f "$LOCAL_UPDATE_DIR/downloaded-update.path" ]; then
+        error "No downloaded update found"
+        return 1
+    fi
+    
+    local update_path=$(cat "$LOCAL_UPDATE_DIR/downloaded-update.path")
+    
+    if [ ! -f "$update_path" ]; then
+        error "Update file not found: $update_path"
+        return 1
+    fi
+    
+    # Prepare target slot using A/B manager
+    info "Preparing target slot for update..."
+    local target_slot
+    target_slot=$(steamdeck-ab-manager prepare-update)
+    
+    if [ -z "$target_slot" ]; then
+        error "Failed to prepare update slot"
+        return 1
+    fi
+    
+    info "Installing to slot: $target_slot"
+    
+    # Apply update using A/B manager
+    if steamdeck-ab-manager apply-update "$update_path" "$target_slot"; then
+        success "Update applied to slot $target_slot"
+        
+        # Switch to new slot
+        steamdeck-ab-manager switch "$target_slot"
+        
+        # Mark update as pending verification
+        touch "$LOCAL_UPDATE_DIR/pending-verification"
+        
+        # Clean up
+        rm -f "$update_path"
+        rm -f "$LOCAL_UPDATE_DIR/downloaded-update.path"
+        rm -f "$LOCAL_UPDATE_DIR/pending-update.json"
+        
+        success "Update installed successfully"
+        success "System will boot from new slot on next reboot"
+        
+        return 0
+    else
+        error "Failed to apply update"
+        return 1
+    fi
+}
+
+# Verify update after reboot
+verify_update() {
+    info "Verifying update installation..."
+    
+    if [ ! -f "$LOCAL_UPDATE_DIR/pending-verification" ]; then
+        info "No pending verification found"
+        return 0
+    fi
+    
+    # Run basic system checks
+    local checks_passed=0
+    local total_checks=5
+    
+    # Check 1: Basic system functionality
+    if systemctl is-system-running --quiet || [ "$(systemctl is-system-running)" = "degraded" ]; then
+        info "✓ System is running"
+        checks_passed=$((checks_passed + 1))
+    else
+        warn "✗ System issues detected"
+    fi
+    
+    # Check 2: Steam Deck services
+    if systemctl is-active --quiet steamdeck-fan-control; then
+        info "✓ Fan control service active"
+        checks_passed=$((checks_passed + 1))
+    else
+        warn "✗ Fan control service not active"
+    fi
+    
+    # Check 3: Network connectivity
+    if ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+        info "✓ Network connectivity OK"
+        checks_passed=$((checks_passed + 1))
+    else
+        warn "✗ Network connectivity issues"
+    fi
+    
+    # Check 4: Graphics subsystem
+    if [ -c /dev/dri/card0 ]; then
+        info "✓ Graphics device available"
+        checks_passed=$((checks_passed + 1))
+    else
+        warn "✗ Graphics device not found"
+    fi
+    
+    # Check 5: Audio subsystem
+    if [ -d /proc/asound ]; then
+        info "✓ Audio subsystem available"
+        checks_passed=$((checks_passed + 1))
+    else
+        warn "✗ Audio subsystem not found"
+    fi
+    
+    # Determine if update is successful
+    local success_threshold=$((total_checks * 80 / 100))  # 80% success rate
+    
+    if [ $checks_passed -ge $success_threshold ]; then
+        success "Update verification passed ($checks_passed/$total_checks checks)"
+        steamdeck-ab-manager mark-successful
+        rm -f "$LOCAL_UPDATE_DIR/pending-verification"
+        return 0
+    else
+        error "Update verification failed ($checks_passed/$total_checks checks)"
+        warn "Automatic rollback will occur on next reboot"
+        return 1
+    fi
+}
+
+# Rollback to previous version
+rollback_update() {
+    info "Rolling back to previous version..."
+    
+    if steamdeck-ab-manager rollback; then
+        success "Rollback initiated"
+        rm -f "$LOCAL_UPDATE_DIR/pending-verification"
+        return 0
+    else
+        error "Rollback failed"
+        return 1
+    fi
+}
+
+# Interactive update process
+interactive_update() {
+    echo -e "${BLUE}Steam Deck OTA Update${NC}"
+    echo "====================="
+    echo ""
+    
+    # Check for updates
+    if ! check_updates; then
+        echo "No updates available or unable to check."
+        return 0
+    fi
+    
+    # Show update information
+    local update_info=$(cat "$LOCAL_UPDATE_DIR/pending-update.json")
+    local new_version=$(echo "$update_info" | jq -r '.version')
+    local description=$(echo "$update_info" | jq -r '.description // "No description available"')
+    local file_size=$(echo "$update_info" | jq -r '.file_size')
+    local file_size_mb=$((file_size / 1024 / 1024))
+    
+    echo "Update Available:"
+    echo "  Version: $new_version"
+    echo "  Size: ${file_size_mb} MB"
+    echo "  Description: $description"
+    echo ""
+    
+    # Confirm update
+    read -p "Do you want to download and install this update? (y/N): " -r
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        info "Update cancelled by user"
+        rm -f "$LOCAL_UPDATE_DIR/pending-update.json"
+        return 0
+    fi
+    
+    # Download and install
+    if download_update && install_update; then
+        echo ""
+        echo -e "${GREEN}Update installed successfully!${NC}"
+        echo "The system will use the new version on next reboot."
+        echo ""
+        read -p "Reboot now to apply the update? (Y/n): " -r
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            info "Rebooting to apply update..."
+            systemctl reboot
+        fi
+    else
+        error "Update failed"
+        return 1
+    fi
+}
+
+# Show status
+show_status() {
+    echo -e "${BLUE}Steam Deck OTA Status${NC}"
+    echo "====================="
+    
+    # Current version
+    if [ -f "/etc/steamdeck-version" ]; then
+        echo "Current Version: $(cat /etc/steamdeck-version)"
+    else
+        echo "Current Version: unknown"
+    fi
+    
+    echo "Update Channel: $UPDATE_CHANNEL"
+    echo "Update Server: $UPDATE_SERVER"
+    echo ""
+    
+    # A/B status
+    steamdeck-ab-manager status
+    echo ""
+    
+    # Pending operations
+    if [ -f "$LOCAL_UPDATE_DIR/pending-update.json" ]; then
+        echo -e "${YELLOW}Pending Update Available${NC}"
+    fi
+    
+    if [ -f "$LOCAL_UPDATE_DIR/downloaded-update.path" ]; then
+        echo -e "${YELLOW}Update Downloaded, Ready to Install${NC}"
+    fi
+    
+    if [ -f "$LOCAL_UPDATE_DIR/pending-verification" ]; then
+        echo -e "${YELLOW}Update Pending Verification${NC}"
+    fi
+}
+
+# Main command handling
+case "${1:-interactive}" in
+    "check")
+        check_updates
+        ;;
+    
+    "download")
+        download_update
+        ;;
+    
+    "install")
+        install_update
+        ;;
+    
+    "verify")
+        verify_update
+        ;;
+    
+    "rollback")
+        rollback_update
+        ;;
+    
+    "interactive"|"")
+        interactive_update
+        ;;
+    
+    "status")
+        show_status
+        ;;
+    
+    "auto")
+        # Automatic update process (for scheduled updates)
+        if check_updates; then
+            if download_update; then
+                info "Update downloaded. Use 'install' command to apply."
+            fi
+        fi
+        ;;
+    
+    "version")
+        echo "steamdeck-ota-update version $VERSION"
+        ;;
+    
+    *)
+        echo "Usage: $0 {check|download|install|verify|rollback|interactive|status|auto|version}"
+        echo ""
+        echo "Commands:"
+        echo "  check       - Check for available updates"
+        echo "  download    - Download pending update"
+        echo "  install     - Install downloaded update"
+        echo "  verify      - Verify update after reboot"
+        echo "  rollback    - Rollback to previous version"
+        echo "  interactive - Interactive update process (default)"
+        echo "  status      - Show update and system status"
+        echo "  auto        - Automatic check and download (for cron)"
+        echo "  version     - Show version information"
+        exit 1
+        ;;
+esac 

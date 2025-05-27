@@ -1,0 +1,18 @@
+[Unit]
+Description=Steam Deck A/B Boot Manager
+Documentation=https://github.com/iZonex/meta-steamdeck-bsp
+After=local-fs.target
+Before=multi-user.target
+ConditionPathExists=/etc/steamdeck-ab/current-slot
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/steamdeck-ab-manager check-boot
+ExecStartPost=/usr/bin/steamdeck-ota-update verify
+TimeoutStartSec=60
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 

@@ -1,192 +1,347 @@
 #!/bin/bash
 #
-# Steam Deck System Installer
-# Interactive installer for deploying system to internal SSD
+# Steam Deck Interactive Installer
+# Supports multiple installation modes including failsafe and dual boot
 #
 
 set -e
 
-# Configuration
-INSTALLER_VERSION="1.0"
-DIALOG_TITLE="Steam Deck System Installer v${INSTALLER_VERSION}"
-WELCOME_FILE="/etc/steamdeck-installer/installer-welcome.txt"
-INSTALL_SCRIPT="/usr/bin/steamdeck-install.sh"
+VERSION="1.0.0"
+INSTALLER_DIR="/usr/share/steamdeck-installer"
 
-# Colors for console output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+PURPLE='\033[0;35m'
+NC='\033[0m'
 
-# Logging function
-log() {
-    echo -e "${GREEN}[INSTALLER]${NC} $1"
-}
+# Dialog configuration
+DIALOG_HEIGHT=20
+DIALOG_WIDTH=70
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1" >&2
-}
+# Check if dialog is available
+if ! command -v dialog >/dev/null 2>&1; then
+    echo "Error: dialog not found. Please install dialog package."
+    exit 1
+fi
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-# Check if we're running on Steam Deck
-check_hardware() {
-    if ! grep -q "Valve Jupiter" /sys/devices/virtual/dmi/id/product_name 2>/dev/null; then
-        if ! dialog --title "$DIALOG_TITLE" --yesno \
-            "This doesn't appear to be a Steam Deck.\n\nDo you want to continue anyway?" 8 50; then
-            exit 1
-        fi
-    fi
-}
-
-# Welcome screen
+# Show welcome message
 show_welcome() {
-    local welcome_text=""
-    if [ -f "$WELCOME_FILE" ]; then
-        welcome_text=$(cat "$WELCOME_FILE")
+    if [ -f "$INSTALLER_DIR/installer-welcome.txt" ]; then
+        dialog --title "Steam Deck Installer" \
+               --textbox "$INSTALLER_DIR/installer-welcome.txt" \
+               $DIALOG_HEIGHT $DIALOG_WIDTH
     else
-        welcome_text="Welcome to Steam Deck System Installer!
-
-This installer will:
-• Detect your Steam Deck internal SSD
-• Create proper partitions (EFI + root)
-• Install optimized Linux system
-• Configure bootloader
-• Set up hardware drivers
-
-WARNING: This will ERASE your internal SSD!
-Make sure to backup important data first."
+        dialog --title "Steam Deck Installer" \
+               --msgbox "Welcome to Steam Deck Linux Installer!\n\nThis installer will help you install Steam Deck Linux to your internal storage with various options including failsafe and dual boot support." \
+               $DIALOG_HEIGHT $DIALOG_WIDTH
     fi
-
-    dialog --title "$DIALOG_TITLE" --msgbox "$welcome_text" 20 70
 }
 
-# Detect target disk
-detect_target_disk() {
+# Detect target disks
+detect_disks() {
     local disks=()
     local disk_info=()
     
-    # Find NVME disks (Steam Deck internal storage)
-    for disk in /dev/nvme*n1; do
-        if [ -b "$disk" ]; then
-            local size=$(lsblk -bndo SIZE "$disk" | head -1)
+    # Find all block devices that look like internal storage
+    for disk in /dev/nvme* /dev/sd*; do
+        if [ -b "$disk" ] && [[ ! "$disk" =~ p[0-9]+$ ]] && [[ ! "$disk" =~ [0-9]+$ ]]; then
+            # Skip USB devices (installer disk)
+            if [[ "$disk" =~ /dev/sd ]] && udevadm info --query=property --name="$disk" | grep -q "ID_BUS=usb"; then
+                continue
+            fi
+            
+            local size=$(lsblk -bndo SIZE "$disk" 2>/dev/null || echo "0")
             local size_gb=$((size / 1024 / 1024 / 1024))
-            local model=$(lsblk -ndo MODEL "$disk" | head -1)
-            disks+=("$disk")
-            disk_info+=("$disk - ${model} (${size_gb}GB)")
-        fi
-    done
-    
-    # Also check SATA disks
-    for disk in /dev/sd[a-z]; do
-        if [ -b "$disk" ] && [ "$disk" != "/dev/sda" ]; then  # Skip USB installer disk
-            local size=$(lsblk -bndo SIZE "$disk" | head -1)
-            local size_gb=$((size / 1024 / 1024 / 1024))
-            local model=$(lsblk -ndo MODEL "$disk" | head -1)
-            disks+=("$disk")
-            disk_info+=("$disk - ${model} (${size_gb}GB)")
+            local model=$(lsblk -ndo MODEL "$disk" 2>/dev/null || echo "Unknown")
+            
+            # Only show disks larger than 32GB (reasonable for Steam Deck)
+            if [ $size_gb -gt 32 ]; then
+                disks+=("$disk")
+                disk_info+=("$disk ($model - ${size_gb}GB)")
+            fi
         fi
     done
     
     if [ ${#disks[@]} -eq 0 ]; then
-        dialog --title "$DIALOG_TITLE" --msgbox \
-            "No suitable target disks found!\n\nInstaller requires NVME or SATA disk." 8 50
+        dialog --title "Error" \
+               --msgbox "No suitable target disks found!\n\nPlease ensure your Steam Deck's internal storage is properly connected." \
+               $DIALOG_HEIGHT $DIALOG_WIDTH
         exit 1
-    elif [ ${#disks[@]} -eq 1 ]; then
-        TARGET_DISK="${disks[0]}"
-        dialog --title "$DIALOG_TITLE" --yesno \
-            "Target disk detected:\n${disk_info[0]}\n\nInstall to this disk?" 8 60
-    else
-        # Multiple disks - let user choose
-        local choices=()
-        for i in "${!disks[@]}"; do
-            choices+=("${disks[i]}" "${disk_info[i]}")
-        done
-        
-        TARGET_DISK=$(dialog --title "$DIALOG_TITLE" --menu \
-            "Select target disk for installation:" 15 70 8 "${choices[@]}" 3>&1 1>&2 2>&3)
     fi
+    
+    # Create dialog options
+    local options=()
+    for i in "${!disks[@]}"; do
+        options+=("$i" "${disk_info[$i]}")
+    done
+    
+    local choice
+    choice=$(dialog --title "Select Target Disk" \
+                    --menu "Choose the disk where you want to install Steam Deck Linux:" \
+                    $DIALOG_HEIGHT $DIALOG_WIDTH 10 \
+                    "${options[@]}" \
+                    3>&1 1>&2 2>&3)
+    
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    
+    echo "${disks[$choice]}"
 }
 
-# Select installation type
-select_installation_type() {
-    INSTALL_TYPE=$(dialog --title "$DIALOG_TITLE" --menu \
-        "Select installation type:" 12 60 4 \
-        "minimal" "Minimal system (2GB, console only)" \
-        "gaming" "Full gaming system (8GB, with Steam)" \
-        "custom" "Custom installation (advanced)" 3>&1 1>&2 2>&3)
+# Select installation mode
+select_install_mode() {
+    local choice
+    choice=$(dialog --title "Installation Mode" \
+                    --menu "Choose installation mode:" \
+                    $DIALOG_HEIGHT $DIALOG_WIDTH 10 \
+                    "failsafe" "A/B Failsafe System (Recommended)" \
+                    "dualboot" "Dual Boot with SteamOS" \
+                    "simple" "Simple Single Partition" \
+                    3>&1 1>&2 2>&3)
+    
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    
+    echo "$choice"
+}
+
+# Show mode information
+show_mode_info() {
+    local mode="$1"
+    local info_text=""
+    
+    case "$mode" in
+        "failsafe")
+            info_text="Failsafe A/B System Features:
+
+• Two root partitions (A/B) for safe updates
+• Automatic rollback on boot failure
+• OTA updates with verification
+• Recovery partition for emergencies
+• Shared data partition for games/user data
+• Maximum safety and reliability
+
+Recommended for most users who want automatic updates with safety guarantees."
+            ;;
+        "dualboot")
+            info_text="Dual Boot System Features:
+
+• All failsafe A/B features included
+• Preserves existing SteamOS installation
+• Boot menu to choose between systems
+• Shared EFI partition for both OS
+• 10 second boot timeout
+
+Perfect for users who want to keep SteamOS while trying Steam Deck Linux."
+            ;;
+        "simple")
+            info_text="Simple System Features:
+
+• Single root partition (traditional)
+• Standard boot configuration
+• Manual updates only
+• Smaller disk space usage
+• No automatic failsafe
+
+For advanced users who prefer traditional Linux setup."
+            ;;
+    esac
+    
+    dialog --title "Installation Mode: $mode" \
+           --msgbox "$info_text" \
+           $DIALOG_HEIGHT $DIALOG_WIDTH
 }
 
 # Confirm installation
 confirm_installation() {
-    local disk_info=$(lsblk -o NAME,SIZE,MODEL "$TARGET_DISK" | head -2 | tail -1)
+    local target_disk="$1"
+    local install_mode="$2"
     
-    dialog --title "$DIALOG_TITLE" --defaultno --yesno \
-        "FINAL CONFIRMATION\n\nTarget: $TARGET_DISK\n$disk_info\nType: $INSTALL_TYPE\n\nThis will COMPLETELY ERASE the target disk!\n\nAre you absolutely sure?" 12 60
+    local warning_text="WARNING: This will ERASE all data on $target_disk!
+
+Installation Details:
+• Target Disk: $target_disk
+• Mode: $install_mode
+• All existing data will be lost
+
+Are you absolutely sure you want to continue?"
+    
+    dialog --title "Final Confirmation" \
+           --yesno "$warning_text" \
+           $DIALOG_HEIGHT $DIALOG_WIDTH
+    
+    return $?
+}
+
+# Show installation progress
+show_progress() {
+    local title="$1"
+    local message="$2"
+    
+    dialog --title "$title" \
+           --infobox "$message\n\nPlease wait..." \
+           10 50
 }
 
 # Run installation
 run_installation() {
+    local target_disk="$1"
+    local install_mode="$2"
+    
     # Clear screen and show progress
     clear
-    log "Starting Steam Deck installation..."
-    log "Target: $TARGET_DISK"
-    log "Type: $INSTALL_TYPE"
-    echo
+    echo -e "${BLUE}Steam Deck Linux Installer${NC}"
+    echo "=========================="
+    echo ""
+    echo "Target Disk: $target_disk"
+    echo "Mode: $install_mode"
+    echo ""
+    echo -e "${YELLOW}Installation in progress...${NC}"
+    echo ""
     
-    # Run the actual installation script
-    if "$INSTALL_SCRIPT" "$TARGET_DISK" "$INSTALL_TYPE"; then
-        dialog --title "$DIALOG_TITLE" --msgbox \
-            "Installation completed successfully!\n\nYou can now:\n• Remove the USB installer\n• Reboot to enjoy your new system\n\nPress OK to reboot." 10 50
-        
-        log "Installation successful! Rebooting in 5 seconds..."
-        sleep 5
-        reboot
+    # Run the appropriate installer script
+    if [ -f "/usr/bin/steamdeck-install-advanced.sh" ]; then
+        /usr/bin/steamdeck-install-advanced.sh "$target_disk" "$install_mode"
     else
-        dialog --title "$DIALOG_TITLE" --msgbox \
-            "Installation failed!\n\nCheck the console output for details.\nThe system will not reboot automatically." 8 50
-        exit 1
+        # Fallback to simple installer
+        /usr/bin/steamdeck-install.sh "$target_disk" "$install_mode"
+    fi
+    
+    local exit_code=$?
+    
+    if [ $exit_code -eq 0 ]; then
+        dialog --title "Installation Complete" \
+               --msgbox "Steam Deck Linux has been successfully installed!\n\nYou can now remove the USB installer and reboot your Steam Deck.\n\nThe system will boot from the internal storage." \
+               $DIALOG_HEIGHT $DIALOG_WIDTH
+    else
+        dialog --title "Installation Failed" \
+               --msgbox "Installation failed with error code $exit_code.\n\nPlease check the console output for details and try again." \
+               $DIALOG_HEIGHT $DIALOG_WIDTH
+        return $exit_code
     fi
 }
 
-# Main installer flow
-main() {
-    # Check if dialog is available
-    if ! command -v dialog >/dev/null 2>&1; then
-        error "Dialog not available. Running in text mode..."
-        exec "$INSTALL_SCRIPT" "$@"
-    fi
+# Show post-installation information
+show_post_install_info() {
+    local install_mode="$1"
     
-    # Check hardware
-    check_hardware
+    local info_text="Installation Complete!
+
+Your Steam Deck Linux system is ready to use.
+
+"
+    
+    case "$install_mode" in
+        "failsafe")
+            info_text+="Failsafe System Commands:
+• steamdeck-ab-manager status - Check A/B status
+• steamdeck-ota-update - Check for updates
+• steamdeck-recovery menu - Recovery tools
+
+The system will automatically rollback if updates fail."
+            ;;
+        "dualboot")
+            info_text+="Dual Boot System:
+• Boot menu will appear on startup
+• Choose between Steam Deck Linux and SteamOS
+• Default timeout: 10 seconds
+
+Failsafe commands are also available."
+            ;;
+        "simple")
+            info_text+="Simple System:
+• Traditional Linux installation
+• Manual updates recommended
+• Use standard package manager"
+            ;;
+    esac
+    
+    info_text+="
+
+Default Login:
+• Username: deck
+• Password: deck
+
+Remember to change the password after first login!"
+    
+    dialog --title "System Ready" \
+           --msgbox "$info_text" \
+           $DIALOG_HEIGHT $DIALOG_WIDTH
+}
+
+# Main installation flow
+main() {
+    # Check if running as root
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: This installer must be run as root."
+        echo "Please run: sudo $0"
+        exit 1
+    fi
     
     # Show welcome
     show_welcome
     
     # Detect target disk
-    detect_target_disk
+    local target_disk
+    target_disk=$(detect_disks)
     
-    # Select installation type
-    select_installation_type
+    # Select installation mode
+    local install_mode
+    install_mode=$(select_install_mode)
+    
+    # Show mode information
+    show_mode_info "$install_mode"
     
     # Confirm installation
-    if confirm_installation; then
-        run_installation
-    else
-        log "Installation cancelled by user."
+    if ! confirm_installation "$target_disk" "$install_mode"; then
+        dialog --title "Installation Cancelled" \
+               --msgbox "Installation has been cancelled by user." \
+               10 50
         exit 0
+    fi
+    
+    # Run installation
+    if run_installation "$target_disk" "$install_mode"; then
+        show_post_install_info "$install_mode"
+        
+        # Ask about reboot
+        if dialog --title "Reboot Now?" \
+                  --yesno "Would you like to reboot now to start using your new system?" \
+                  10 50; then
+            reboot
+        fi
+    else
+        echo "Installation failed. Please check the output above for errors."
+        exit 1
     fi
 }
 
-# Handle Ctrl+C
-trap 'echo; log "Installation cancelled."; exit 1' INT
-
-# Run main function
-main "$@" 
+# Handle command line arguments
+case "${1:-interactive}" in
+    "interactive"|"")
+        main
+        ;;
+    "version")
+        echo "steamdeck-installer version $VERSION"
+        ;;
+    "help"|"-h"|"--help")
+        echo "Steam Deck Linux Installer"
+        echo ""
+        echo "Usage: $0 [command]"
+        echo ""
+        echo "Commands:"
+        echo "  interactive  - Run interactive installer (default)"
+        echo "  version      - Show version information"
+        echo "  help         - Show this help message"
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Run '$0 help' for usage information."
+        exit 1
+        ;;
+esac 

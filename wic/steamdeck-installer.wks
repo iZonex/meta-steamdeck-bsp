@@ -1,0 +1,8 @@
+# Steam Deck Installer USB Layout
+# Bootable USB installer with failsafe and dual boot support
+
+# EFI boot partition for installer
+part /boot --source bootimg-efi --sourceparams="loader=systemd-boot" --label installer-efi --active --align 1024 --size 512
+
+# Root filesystem with installer tools
+part / --source rootfs --ondisk sda --fstype=ext4 --label installer-root --align 1024 --size 2048 --extra-space 512 

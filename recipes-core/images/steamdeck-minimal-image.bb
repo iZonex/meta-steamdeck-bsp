@@ -17,6 +17,7 @@ IMAGE_INSTALL += " \
     linux-firmware-rtw89 \
     steamdeck-firmware \
     steamdeck-tools \
+    steamdeck-failsafe \
     mesa \
     mesa-drivers \
     alsa-utils \
@@ -29,6 +30,7 @@ IMAGE_INSTALL += " \
     curl \
     wget \
     git \
+    jq \
 "
 
 # Remove unnecessary packages to keep image small

@@ -3,6 +3,14 @@ DESCRIPTION = "Complete gaming image for Steam Deck OLED with Steam client and d
 
 require steamdeck-minimal-image.bb
 
+# Failsafe and system management
+IMAGE_INSTALL += " \
+    steamdeck-failsafe \
+    jq \
+    curl \
+    wget \
+"
+
 # Desktop environment and graphics
 IMAGE_INSTALL += " \
     xserver-xorg \
