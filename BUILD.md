@@ -358,7 +358,17 @@ If you still encounter this issue, ensure you're using the latest version of the
 2. Check that your image recipes use valid IMAGE_FEATURES (see error message for list of valid features)
 3. For automatic root login, use `serial-autologin-root` and `empty-root-password` features
 
-#### 7. Build Directory Issues
+#### 7. Virtual Kernel Provider Issues
+
+**Error**: `Nothing PROVIDES 'virtual/kernel'` or `Required build target has no buildable providers`
+
+**Solution**: This has been fixed in the latest version. The machine configuration now correctly sets `linux-steamdeck` as the preferred kernel provider. If you encounter this issue:
+
+1. Ensure `PREFERRED_PROVIDER_virtual/kernel = "linux-steamdeck"` is set in your machine configuration
+2. Verify that the `linux-steamdeck` recipe exists and is compatible with your machine
+3. Check that all required kernel configuration files exist in the recipe's files directory
+
+#### 8. Build Directory Issues
 
 If BitBake can't find the build directory or configuration:
 ```bash
