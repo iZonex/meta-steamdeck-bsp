@@ -71,8 +71,8 @@ IMAGE_INSTALL:remove = " \
 # Keep installer image smaller
 IMAGE_ROOTFS_EXTRA_SPACE = "524288"
 
-# Enable installer auto-login
-IMAGE_FEATURES += "autologin"
+# Enable installer auto-login with valid features
+IMAGE_FEATURES += "serial-autologin-root empty-root-password"
 
 # Use WIC for bootable USB creation
 WKS_FILE = "steamdeck-installer.wks"
