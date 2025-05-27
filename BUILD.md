@@ -21,6 +21,17 @@ Comprehensive guide for building Steam Deck Linux images using the Yocto Project
 
 ## Installing Dependencies
 
+### Automatic Installation (Recommended)
+
+Use our automated installer script that detects your Ubuntu version and installs the correct packages:
+
+```bash
+# Download and run the dependency installer
+curl -fsSL https://raw.githubusercontent.com/iZonex/meta-steamdeck-bsp/main/scripts/install-deps.sh | bash
+```
+
+### Manual Installation
+
 ### Ubuntu/Debian
 
 ```bash
@@ -29,8 +40,19 @@ sudo apt-get install -y \
     gawk wget git diffstat unzip texinfo gcc build-essential \
     chrpath socat cpio python3 python3-pip python3-pexpect \
     xz-utils debianutils iputils-ping python3-git python3-jinja2 \
-    libegl1-mesa libsdl1.2-dev python3-subunit mesa-common-dev \
-    zstd liblz4-tool file locales libacl1
+    libegl1-mesa-dev libsdl1.2-dev python3-subunit mesa-common-dev \
+    zstd liblz4-tool file locales libacl1 pylint
+```
+
+**Note for Ubuntu 24.04 (Noble)**: If you encounter package not found errors, try:
+```bash
+# Alternative package names for Ubuntu 24.04
+sudo apt-get install -y \
+    gawk wget git diffstat unzip texinfo gcc build-essential \
+    chrpath socat cpio python3 python3-pip python3-pexpect \
+    xz-utils debianutils iputils-ping python3-git python3-jinja2 \
+    libegl1 libsdl1.2-dev python3-subunit mesa-common-dev \
+    zstd liblz4-tool file locales libacl1 pylint
 ```
 
 ### Fedora/CentOS/RHEL
@@ -254,6 +276,19 @@ lsblk /dev/sdX
 
 ## Troubleshooting
 
+### Package Installation Issues
+
+If you encounter package not found errors during dependency installation:
+
+```bash
+# Ubuntu 24.04 specific fixes
+sudo apt-get install libegl1-mesa-dev || sudo apt-get install libegl1
+sudo apt-get install pylint || sudo apt-get install pylint3
+
+# Use our automatic installer instead
+curl -fsSL https://raw.githubusercontent.com/iZonex/meta-steamdeck-bsp/main/scripts/install-deps.sh | bash
+```
+
 ### Disk Space Issues
 
 ```bash
@@ -287,17 +322,6 @@ bitbake PACKAGE_NAME
 bitbake -v steamdeck-image
 ```
 
-### Dependency Issues
-
-```bash
-# Check layer dependencies
-bitbake-layers show-layers
-bitbake-layers check-layers
-
-# Check recipe syntax
-bitbake -p
-```
-
 ## Performance Optimization
 
 ### Caching
@@ -320,85 +344,6 @@ BB_NUMBER_THREADS = "4"
 PARALLEL_MAKE = "-j 4"
 ```
 
-### Disk Subsystem
-
-```bash
-# Use tmpfs for tmp directory (requires lots of RAM)
-sudo mount -t tmpfs -o size=8G tmpfs /tmp
-
-# Use fast disk for TMPDIR
-TMPDIR = "/fast/disk/tmp"
-```
-
-## Customization
-
-### Adding Packages to Images
-
-In `conf/local.conf`:
-
-```bash
-# Add packages to all images
-CORE_IMAGE_EXTRA_INSTALL += "htop nano git"
-
-# Or in specific image recipe
-IMAGE_INSTALL:append = " my-custom-package"
-```
-
-### Creating Custom Image
-
-Create `recipes-core/images/my-steamdeck-image.bb`:
-
-```bitbake
-require steamdeck-image.bb
-
-SUMMARY = "My Custom Steam Deck Image"
-
-IMAGE_INSTALL += " \
-    my-package1 \
-    my-package2 \
-"
-
-# Additional disk space
-IMAGE_ROOTFS_EXTRA_SPACE = "2097152"
-```
-
-### Kernel Modification
-
-```bash
-# Kernel configuration
-bitbake -c menuconfig virtual/kernel
-
-# Save changes
-bitbake -c savedefconfig virtual/kernel
-```
-
-## Automation
-
-### Full Build Script
-
-```bash
-#!/bin/bash
-set -e
-
-echo "Starting Steam Deck BSP build..."
-
-# Setup environment
-cd ~/steamdeck-build/poky
-source oe-init-build-env build-steamdeck
-
-# Build all images
-for image in steamdeck-minimal-image steamdeck-installer-image steamdeck-image; do
-    echo "Building $image..."
-    bitbake $image
-done
-
-echo "Build completed! Images are in tmp/deploy/images/steamdeck-oled/"
-```
-
-### CI/CD Integration
-
-See `.github/workflows/build.yml` for GitHub Actions configuration example.
-
 ## Useful Commands
 
 ```bash
@@ -416,16 +361,12 @@ bitbake -c cleanall steamdeck-image
 
 # Check recipe syntax
 bitbake -p
-
-# Build statistics
-bitbake -D steamdeck-image 2>&1 | tee build.log
 ```
 
 ## Additional Resources
 
 - [Yocto Project Manual](https://docs.yoctoproject.org/)
 - [BitBake User Manual](https://docs.yoctoproject.org/bitbake/)
-- [Yocto Project Reference Manual](https://docs.yoctoproject.org/ref-manual/)
 - [Steam Deck Hardware Documentation](https://www.steamdeck.com/en/tech)
 
 ## Getting Help

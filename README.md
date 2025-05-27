@@ -36,6 +36,18 @@ A comprehensive Board Support Package (BSP) for Steam Deck OLED using Yocto Proj
 
 ## Quick Start
 
+### Easy Installation (Recommended)
+
+```bash
+# Download and run dependency installer
+curl -fsSL https://raw.githubusercontent.com/iZonex/meta-steamdeck-bsp/main/scripts/install-deps.sh | bash
+
+# Clone and build
+git clone https://github.com/iZonex/meta-steamdeck-bsp.git
+cd meta-steamdeck-bsp
+# Follow BUILD.md for complete instructions
+```
+
 ### Building Images
 
 ```bash
