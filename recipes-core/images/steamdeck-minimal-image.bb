@@ -18,7 +18,7 @@ IMAGE_INSTALL += " \
     steamdeck-tools \
     steamdeck-failsafe \
     mesa \
-    mesa-drivers \
+    mesa-megadriver \
     alsa-utils \
     pulseaudio \
     systemd \

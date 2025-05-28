@@ -62,7 +62,7 @@ IMAGE_INSTALL += " \
     linux-firmware-amdgpu \
     steamdeck-firmware \
     mesa \
-    mesa-drivers \
+    mesa-megadriver \
 "
 
 # Remove packages not needed for installer
