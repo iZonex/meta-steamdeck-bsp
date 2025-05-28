@@ -184,7 +184,7 @@ INIT_MANAGER = "systemd"
 ### Available Images
 
 1. **steamdeck-minimal-image** - Minimal console system
-2. **steamdeck-image** - Full gaming system with Steam
+2. **steamdeck-image** - Full work station with all hardware support
 3. **steamdeck-installer-image** - Interactive installer
 
 ### Build Commands
