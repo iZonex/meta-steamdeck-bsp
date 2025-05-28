@@ -91,6 +91,9 @@ cd poky
 
 # Clone required meta-layers
 git clone -b scarthgap git://git.openembedded.org/meta-openembedded
+
+# Clone AMD hardware support layer
+git clone -b scarthgap https://git.yoctoproject.org/git/meta-amd
 ```
 
 ### 2. Clone Steam Deck BSP
@@ -111,6 +114,11 @@ bitbake-layers add-layer ../meta-openembedded/meta-oe
 bitbake-layers add-layer ../meta-openembedded/meta-python
 bitbake-layers add-layer ../meta-openembedded/meta-multimedia
 bitbake-layers add-layer ../meta-openembedded/meta-networking
+
+# Add AMD hardware support layers
+bitbake-layers add-layer ../meta-amd/meta-amd-bsp
+
+# Add Steam Deck BSP layer
 bitbake-layers add-layer ../meta-steamdeck-bsp
 
 # Verify added layers
