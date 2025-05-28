@@ -376,7 +376,35 @@ If you still encounter this issue, ensure you're using the latest version of the
 2. The kernel recipe now inherits from `linux-yocto` and uses `git://git.yoctoproject.org/linux-yocto.git`
 3. If you have `BB_NO_NETWORK = "1"` set for Ubuntu 24.04 compatibility, the new recipe will work with this setting
 
-#### 9. Build Directory Issues
+#### 9. Package Availability Issues
+
+**Error**: `Nothing RPROVIDES 'firefox'` or similar package not found errors
+
+**Solution**: Some packages may not be available in standard Yocto builds. Use the appropriate image type:
+
+1. **For basic builds**: Use `steamdeck-image` which includes only commonly available packages
+2. **For full gaming**: Use `steamdeck-image-full` but ensure you have the required meta layers:
+   ```bash
+   bitbake-layers add-layer ../meta-games
+   bitbake-layers add-layer ../meta-wine  
+   bitbake-layers add-layer ../meta-multimedia
+   bitbake-layers add-layer ../meta-gnome
+   ```
+
+3. **Manual package removal**: Edit the image recipe and comment out unavailable packages:
+   ```bash
+   # Comment out packages that aren't available
+   # firefox \
+   links \  # Use lightweight alternative
+   ```
+
+**Common package alternatives**:
+- `firefox` → `links` (text browser) or `chromium` (if meta-browser available)
+- `vlc` → `ffmpeg` (basic multimedia)
+- `steam` → Build without Steam for basic testing
+- `wine` → Skip for minimal gaming setup
+
+#### 10. Build Directory Issues
 
 If BitBake can't find the build directory or configuration:
 ```bash

@@ -1,8 +1,32 @@
-# Steam Deck OLED BSP
+# Steam Deck OLED BSP - Professional Work Station
 
-A comprehensive Board Support Package (BSP) for Steam Deck OLED using Yocto Project, featuring advanced failsafe systems and dual boot capabilities.
+Board Support Package (BSP) for Steam Deck OLED as a **professional work station** with full hardware support. This BSP transforms your Steam Deck into a powerful portable workstation while preserving ALL hardware capabilities including controllers, multimedia, and streaming.
+
+## Key Features
+
+- **Full Hardware Support**: Controllers, haptics, sensors, all Steam Deck features
+- **Multimedia Capabilities**: Video streaming, media playback, GStreamer, VLC
+- **Professional Tools**: SSH, VPN, network monitoring, system administration
+- **Development Environment**: Python (with NumPy, OpenCV), Node.js, GCC, debugging tools  
+- **Remote Access**: OpenSSH server, VPN clients, secure file transfer
+- **Hardware Control**: GPIO, I2C, SPI tools for hardware interfacing
+- **System Monitoring**: htop, iotop, sensors, performance tools
+- **Failsafe Updates**: A/B partition system with automatic rollback
+- **Dual Boot Support**: Preserve original SteamOS alongside custom system
 
 ## Features
+
+### Professional Work Station
+
+- **Full Hardware Support**: All Steam Deck controllers, haptics, sensors, and hardware features
+- **Multimedia & Streaming**: VLC, MPV, GStreamer, video streaming capabilities
+- **Controller Support**: Joystick tools, Steam Input, controller configuration
+- **Remote Access**: SSH server, VPN clients (OpenVPN, WireGuard)
+- **Development Tools**: Python (NumPy, OpenCV), Node.js, GCC, GDB, Git
+- **System Monitoring**: htop, iotop, sensors, network tools
+- **Hardware Control**: GPIO, I2C, SPI tools for interfacing
+- **Network Tools**: nmap, tcpdump, Wireshark, iperf3
+- **File Management**: rsync, scp, compression tools
 
 ### Core System
 
@@ -11,7 +35,7 @@ A comprehensive Board Support Package (BSP) for Steam Deck OLED using Yocto Proj
 - **OLED Display** with proper color management
 - **Audio subsystem** with enhanced DSP support
 - **WiFi 6E and Bluetooth** connectivity
-- **Gaming controls** and haptic feedback
+- **Hardware controls** for professional applications
 
 ### Advanced Failsafe System
 
@@ -64,11 +88,42 @@ bitbake-layers add-layer ../meta-steamdeck-bsp
 # Set machine configuration
 echo 'MACHINE = "steamdeck-oled"' >> conf/local.conf
 
-# Build images
-bitbake steamdeck-image                    # Full gaming system
-bitbake steamdeck-minimal-image           # Minimal console system
-bitbake steamdeck-installer-image         # Interactive installer
+# Build images (choose based on your needs)
+bitbake steamdeck-minimal-image           # Minimal console system (~2-4 GB)
+bitbake steamdeck-image                   # Full work station with ALL hardware support (~8-10 GB)
+bitbake steamdeck-image-full              # Gaming system (adds Steam, Wine, games) (~15-20 GB)
+bitbake steamdeck-installer-image         # Interactive installer (~1-2 GB)
 ```
+
+#### Image Types
+
+- **steamdeck-minimal-image**: Console-only system with basic tools and failsafe features
+- **steamdeck-image**: **Full-featured work station** with ALL Steam Deck hardware support, multimedia, controllers, Python, development tools (NO gaming packages)
+- **steamdeck-image-full**: Gaming system that adds Steam, Wine, and games to the work station base
+- **steamdeck-installer-image**: Interactive installer for USB deployment
+
+#### What's Included in Work Station Image
+
+✅ **Hardware**: Controllers, haptics, sensors, all Steam Deck features  
+✅ **Multimedia**: Video streaming, VLC, MPV, GStreamer  
+✅ **Development**: Python (NumPy, OpenCV), Node.js, GCC, Git  
+✅ **Networking**: SSH, VPN, monitoring tools  
+✅ **System Tools**: htop, sensors, hardware control  
+❌ **Gaming**: Steam, Wine, games (use steamdeck-image-full for gaming)
+
+#### For Gaming Use (Optional)
+
+If you need gaming functionality, use `steamdeck-image-full` and add these layers to your `bblayers.conf`:
+
+```bash
+# Add gaming and multimedia layers
+bitbake-layers add-layer ../meta-games
+bitbake-layers add-layer ../meta-wine  
+bitbake-layers add-layer ../meta-multimedia
+bitbake-layers add-layer ../meta-gnome
+```
+
+**Note**: If you encounter package availability errors (like the `firefox` error), use `steamdeck-image` instead of `steamdeck-image-full`, or remove unavailable packages from the recipe.
 
 ### Installation Options
 
