@@ -76,7 +76,7 @@ jobs:
         bitbake-layers add-layer ../meta-openembedded/meta-multimedia
         bitbake-layers add-layer ../meta-openembedded/meta-networking
         bitbake-layers add-layer ../meta-amd/meta-amd-bsp
-        bitbake-layers add-layer ../meta-steamdeck-bsp
+        bitbake-layers add-layer ../../meta-steamdeck-bsp
         
         # Configure build
         echo 'MACHINE = "${{ env.MACHINE }}"' >> conf/local.conf
