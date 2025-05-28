@@ -28,7 +28,7 @@ IMAGE_INSTALL += " \
 IMAGE_INSTALL += " \
     openbox \
     lxdm \
-    lxterminal \
+    xterm \
     pcmanfm \
     firefox \
     gparted \
