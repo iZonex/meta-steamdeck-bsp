@@ -36,68 +36,44 @@ IMAGE_INSTALL += " \
     vim \
 "
 
-# Joystick and controller support (ВАЖНО!)
+# Joystick and controller support (basic packages only)
 IMAGE_INSTALL += " \
     joystick \
-    jstest-gtk \
-    antimicrox \
-    steam-devices \
 "
 
-# Multimedia support for streams and video (ВАЖНО!)
+# Multimedia support for streams and video (basic packages)
 IMAGE_INSTALL += " \
     gstreamer1.0 \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad \
-    gstreamer1.0-plugins-ugly \
-    gstreamer1.0-vaapi \
     ffmpeg \
-    vlc \
-    mpv \
 "
 
-# Network and remote access tools
+# Network and remote access tools (basic)
 IMAGE_INSTALL += " \
     openssh \
     openssh-sftp-server \
-    openvpn \
-    wireguard-tools \
-    nmap \
-    tcpdump \
-    wireshark \
-    iperf3 \
+    curl \
+    wget \
 "
 
-# System monitoring and control
+# System monitoring and control (basic)
 IMAGE_INSTALL += " \
     htop \
-    iotop \
-    lsof \
-    strace \
-    tmux \
-    screen \
     tree \
 "
 
-# Hardware control and sensors (ВАЖНО!)
+# Hardware control and sensors (basic)
 IMAGE_INSTALL += " \
-    i2c-tools \
-    spi-tools \
-    gpio-utils \
-    lm-sensors \
-    dmidecode \
     usbutils \
     pciutils \
 "
 
-# Programming and automation (Python ОБЯЗАТЕЛЬНО!)
+# Programming and automation (basic Python)
 IMAGE_INSTALL += " \
     python3 \
     python3-pip \
     python3-dev \
-    python3-numpy \
-    python3-opencv \
     nodejs \
     npm \
     bash \
@@ -139,6 +115,6 @@ IMAGE_ROOTFS_EXTRA_SPACE = "4194304"
 
 COMPATIBLE_MACHINE = "steamdeck-oled"
 
-# Note: This image provides FULL Steam Deck hardware functionality
-# including joysticks, multimedia, streaming, and development tools.
-# Gaming packages (Steam, Wine, games) are excluded for work use. 
+# Note: This image provides Steam Deck work station functionality
+# with basic hardware support and commonly available packages.
+# Advanced packages may require additional meta layers. 

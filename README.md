@@ -90,23 +90,34 @@ echo 'MACHINE = "steamdeck-oled"' >> conf/local.conf
 
 # Build images (choose based on your needs)
 bitbake steamdeck-minimal-image           # Minimal console system (~2-4 GB)
-bitbake steamdeck-image                   # Full work station with ALL hardware support (~8-10 GB)
+bitbake steamdeck-image                   # Basic work station with common packages (~6-8 GB)
+bitbake steamdeck-image-extended          # Extended work station with advanced packages (~10-12 GB)
 bitbake steamdeck-installer-image         # Interactive installer (~1-2 GB)
 ```
 
 #### Image Types
 
 - **steamdeck-minimal-image**: Console-only system with basic tools and failsafe features
-- **steamdeck-image**: **Full-featured work station** with ALL Steam Deck hardware support, multimedia, controllers, Python, development tools
+- **steamdeck-image**: **Basic work station** with commonly available packages (no additional meta layers required)
+- **steamdeck-image-extended**: **Extended work station** with advanced packages (requires additional meta layers)
 - **steamdeck-installer-image**: Interactive installer for USB deployment
 
-#### What's Included in Work Station Image
+#### What's Included
 
-✅ **Hardware**: Controllers, haptics, sensors, all Steam Deck features  
-✅ **Multimedia**: Video streaming, VLC, MPV, GStreamer  
-✅ **Development**: Python (NumPy, OpenCV), Node.js, GCC, Git  
-✅ **Networking**: SSH, VPN, monitoring tools  
-✅ **System Tools**: htop, sensors, hardware control
+**Basic Work Station (steamdeck-image)**:
+✅ **Hardware**: Basic controller support, USB/PCI tools  
+✅ **Multimedia**: GStreamer, FFmpeg (basic)  
+✅ **Development**: Python, Node.js, GCC, Git  
+✅ **Networking**: SSH, basic tools  
+✅ **System Tools**: htop, tree, basic monitoring  
+
+**Extended Work Station (steamdeck-image-extended)**:
+✅ **All basic features** plus:  
+✅ **Advanced Multimedia**: VLC, MPV, hardware acceleration  
+✅ **Advanced Python**: NumPy, OpenCV  
+✅ **Advanced Networking**: VPN, Wireshark, nmap  
+✅ **Advanced Controllers**: jstest-gtk, antimicrox  
+✅ **Advanced System Tools**: tmux, strace, sensors
 
 ### Installation Options
 
