@@ -14,7 +14,6 @@ IMAGE_INSTALL += " \
     kernel-modules \
     linux-firmware \
     linux-firmware-amdgpu \
-    linux-firmware-rtw89 \
     steamdeck-firmware \
     steamdeck-tools \
     steamdeck-failsafe \
@@ -31,6 +30,8 @@ IMAGE_INSTALL += " \
     wget \
     git \
     jq \
+    vim \
+    bash-completion \
 "
 
 # Remove unnecessary packages to keep image small

@@ -55,15 +55,19 @@ IMAGE_INSTALL += " \
     openssl \
 "
 
-# Remove packages not needed for installer
-IMAGE_INSTALL:remove = " \
-    packagegroup-core-boot \
+# Hardware support
+IMAGE_INSTALL += " \
     kernel-modules \
+    linux-firmware \
     linux-firmware-amdgpu \
-    linux-firmware-rtw89 \
     steamdeck-firmware \
     mesa \
     mesa-drivers \
+"
+
+# Remove packages not needed for installer
+IMAGE_INSTALL:remove = " \
+    packagegroup-core-boot \
     alsa-utils \
     pulseaudio \
 "
