@@ -89,7 +89,7 @@ bitbake-layers add-layer ../meta-steamdeck-bsp
 echo 'MACHINE = "steamdeck-oled"' >> conf/local.conf
 
 # Build images (choose based on your needs)
-bitbake steamdeck-minimal-image           # Minimal console system (~2-4 GB)
+bitbake steamdeck-minimal-image           # Minimal console system (~2-4 GB) - AUTO-BUILT
 bitbake steamdeck-image                   # Basic work station with common packages (~6-8 GB)
 bitbake steamdeck-image-extended          # Extended work station with advanced packages (~10-12 GB)
 bitbake steamdeck-installer-image         # Interactive installer (~1-2 GB)
@@ -97,10 +97,17 @@ bitbake steamdeck-installer-image         # Interactive installer (~1-2 GB)
 
 #### Image Types
 
-- **steamdeck-minimal-image**: Console-only system with basic tools and failsafe features
-- **steamdeck-image**: **Basic work station** with commonly available packages (no additional meta layers required)
+- **steamdeck-minimal-image**: Console-only system with basic tools and failsafe features ✅ **AUTO-BUILT**
+- **steamdeck-image**: **Basic work station** with commonly available packages (manual build)
 - **steamdeck-image-extended**: **Extended work station** with advanced packages (requires additional meta layers)
-- **steamdeck-installer-image**: Interactive installer for USB deployment
+- **steamdeck-installer-image**: Interactive installer for USB deployment (manual build)
+
+#### Current Status
+
+🤖 **GitHub Actions** automatically builds: `steamdeck-minimal-image`  
+🔧 **Manual build required** for: `steamdeck-image`, `steamdeck-image-extended`, `steamdeck-installer-image`
+
+The basic and extended images require package availability fixes and additional meta layers.
 
 #### What's Included
 

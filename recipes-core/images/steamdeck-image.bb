@@ -46,7 +46,6 @@ IMAGE_INSTALL += " \
     gstreamer1.0 \
     gstreamer1.0-plugins-base \
     gstreamer1.0-plugins-good \
-    ffmpeg \
 "
 
 # Network and remote access tools (basic)

@@ -7,10 +7,14 @@ require steamdeck-image.bb
 IMAGE_INSTALL += " \
     vlc \
     mpv \
+    ffmpeg \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-vaapi \
 "
+
+# Accept commercial licenses for multimedia
+LICENSE_FLAGS_ACCEPTED += "commercial"
 
 # Advanced Python packages (requires meta-python)
 IMAGE_INSTALL += " \

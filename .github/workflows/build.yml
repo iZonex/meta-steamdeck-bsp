@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        image: [steamdeck-minimal-image, steamdeck-image, steamdeck-installer-image]
+        image: [steamdeck-minimal-image]
     
     steps:
     - name: Checkout BSP
@@ -158,24 +158,13 @@ jobs:
           
           ## Images Included
           
-          - **steamdeck-minimal-image** - Minimal console system (~2-4 GB)
-          - **steamdeck-image** - Full gaming system with Steam (~8-12 GB)  
-          - **steamdeck-installer-image** - Interactive installer (~1-2 GB)
+          - **steamdeck-minimal-image** - Minimal console system with failsafe features (~2-4 GB)
           
           ## Installation Methods
           
-          ### Interactive Installer (Recommended)
-          1. Download `steamdeck-installer-image-steamdeck-oled.wic.bz2`
-          2. Flash to USB: `bmaptool copy steamdeck-installer-image-steamdeck-oled.wic.bz2 /dev/sdX`
-          3. Boot Steam Deck from USB
-          4. Follow installer prompts
-          
           ### Direct Flash
           ```bash
-          # Full system
-          bmaptool copy steamdeck-image-steamdeck-oled.wic.bz2 /dev/sdX
-          
-          # Minimal system  
+          # Minimal system with failsafe features
           bmaptool copy steamdeck-minimal-image-steamdeck-oled.wic.bz2 /dev/sdX
           ```
           
