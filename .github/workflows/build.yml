@@ -60,11 +60,6 @@ jobs:
         cd poky
         git clone -b scarthgap git://git.openembedded.org/meta-openembedded
 
-    - name: Clone meta-amd for AMD hardware support
-      run: |
-        cd poky
-        git clone -b scarthgap https://git.yoctoproject.org/git/meta-amd
-
     - name: Setup build environment
       run: |
         cd poky
@@ -75,7 +70,6 @@ jobs:
         bitbake-layers add-layer ../meta-openembedded/meta-python
         bitbake-layers add-layer ../meta-openembedded/meta-multimedia
         bitbake-layers add-layer ../meta-openembedded/meta-networking
-        bitbake-layers add-layer ../meta-amd/meta-amd-bsp
         bitbake-layers add-layer ../../meta-steamdeck-bsp
         
         # Configure build
