@@ -23,6 +23,10 @@ do_configure:prepend() {
     if [ -f "${S}/arch/x86/configs/steamdeck_defconfig" ]; then
         cp ${S}/arch/x86/configs/steamdeck_defconfig ${B}/.config
     fi
+    
+    # Disable objtool if causing build issues
+    echo "CONFIG_OBJTOOL=n" >> ${B}/.config
+    echo "CONFIG_STACK_VALIDATION=n" >> ${B}/.config
 }
 
 # Kernel modules to auto-load
@@ -31,7 +35,10 @@ KERNEL_MODULE_AUTOLOAD += "amdgpu snd_hda_intel"
 COMPATIBLE_MACHINE = "steamdeck-oled"
 
 # Dependencies
-DEPENDS += "bc-native bison-native"
+DEPENDS += "bc-native bison-native flex-native libelf-native"
+
+# Additional build dependencies for objtool
+DEPENDS += "elfutils-native"
 
 # Prevent network access issues - use specific commit when building in CI
 # SRCREV = "specific-commit-hash-here" 
